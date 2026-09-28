@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+dist-electron/
+portable/
+extracted_app/
+coverage/
+.DS_Store
+*.log
+build-output.txt
+build-log.txt
+.env*
+!.env.example

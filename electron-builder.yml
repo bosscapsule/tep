@@ -1,0 +1,37 @@
+appId: com.anatomyzh.desktop
+productName: Test Portal
+artifactName: Academic 3D Test Portal Setup ${version}.${ext}
+asar: true
+compression: maximum
+removePackageScripts: true
+electronLanguages:
+  - en-US
+  - ru
+  - uz
+directories:
+  output: dist-electron
+files:
+  - dist/**/*
+  - electron-main.cjs
+  - electron-security.cjs
+  - preload.js
+  - package.json
+publish:
+  provider: github
+  owner: bloodnft-hub
+  repo: ai
+win:
+  target:
+    - nsis
+  sign: null
+  signAndEditExecutable: false
+  signDlls: false
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Test Portal
+  uninstallDisplayName: Academic 3D Test Portal
+  allowElevation: true
+  perMachine: false
