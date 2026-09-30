@@ -32,14 +32,14 @@ The desktop app stores the password encrypted in the operating system user-data 
 
 Auto-update works only for an installed, packaged Windows build. It does not run from `npm run electron:dev` and it does not update a standalone `.exe` downloaded without installation.
 
-The updater checks GitHub Releases in `bloodnft-hub/ai`. To publish an update:
+The updater checks GitHub Releases in `bosscapsule/tep`. To publish an update:
 
 1. Increase the `version` in `package.json` (for example, `1.2.0`).
 2. Run `npm run electron:build`.
 3. Create a GitHub Release with the new version tag, for example `v1.2.0`.
-4. Upload the generated `Academic 3D Test Portal Setup 1.2.0.exe`, its `.blockmap`, and `latest.yml` from `dist-electron/`.
+4. Upload the generated `Academic-3D-Test-Portal-Setup-1.2.0.exe`, its `.blockmap`, and `latest.yml` from `dist-electron/`.
 
-The installed application checks for updates when it starts, downloads them, and installs them when it restarts. Changing the application name or icon also requires a new version and a new release.
+The installed application checks for updates when it starts, downloads them, then closes and installs the update automatically. Changing the application name or icon also requires a new version and a new release.
 
 ## Application and installer icon
 
