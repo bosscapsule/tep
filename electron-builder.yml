@@ -18,8 +18,8 @@ files:
   - package.json
 publish:
   provider: github
-  owner: bloodnft-hub
-  repo: ai
+  owner: bosscapsule
+  repo: tep
 win:
   target:
     - nsis

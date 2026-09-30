@@ -81,6 +81,7 @@ if (!gotSingleInstanceLock) {
       width: 1280,
       height: 820,
       fullscreen: true,
+      frame: false,
       autoHideMenuBar: true,
       minimizable: false,
       maximizable: false,
@@ -122,8 +123,6 @@ if (!gotSingleInstanceLock) {
         console.error('Failed to connect to the development server:', error);
       });
       win.setFullScreen(false);
-      win.setMinimizable(true);
-      win.setMaximizable(true);
       win.setResizable(true);
     }
 
