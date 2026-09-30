@@ -122,8 +122,6 @@ if (!gotSingleInstanceLock) {
       void win.loadURL('http://localhost:3000').catch((error) => {
         console.error('Failed to connect to the development server:', error);
       });
-      win.setFullScreen(false);
-      win.setResizable(true);
     }
 
     win.removeMenu();
