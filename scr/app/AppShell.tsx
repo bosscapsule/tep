@@ -16,6 +16,7 @@ export function AppShell() {
     setLanguage,
     theme,
     isSuperAdmin,
+    setIsSuperAdmin,
     activeUniversity,
     setActiveUniversity,
     toggleTheme,
