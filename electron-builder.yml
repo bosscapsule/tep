@@ -34,4 +34,4 @@ nsis:
   shortcutName: Test Portal
   uninstallDisplayName: Academic 3D Test Portal
   allowElevation: true
-  perMachine: false
+  perMachine: true
