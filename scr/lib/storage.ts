@@ -207,6 +207,22 @@ export const storage = {
     if (active?.id === universityId) storage.setCurrentUniversity(updated);
     return updated;
   },
+  extendUniversityExpiry: (universityId: string, expiresAt: string): University | null => {
+    const universities = storage.getUniversities();
+    const index = universities.findIndex((university) => university.id === universityId);
+    if (index < 0 || !expiresAt) return null;
+
+    const parsedDate = new Date(expiresAt);
+    if (Number.isNaN(parsedDate.getTime())) return null;
+
+    const updated = { ...universities[index], expiresAt: parsedDate.toISOString() };
+    universities[index] = updated;
+    storage.saveUniversities(universities);
+
+    const active = storage.getCurrentUniversity();
+    if (active?.id === universityId) storage.setCurrentUniversity(updated);
+    return updated;
+  },
 
   getQuestions: (): Question[] => {
     const key = getScopedKey(STORAGE_KEYS.QUESTIONS);

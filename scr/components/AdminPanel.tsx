@@ -585,11 +585,16 @@ export const AdminPanel: React.FC<Props> = ({
   const [isSuperAdminDatePickerOpen, setIsSuperAdminDatePickerOpen] = useState(false);
   const [currentSuperAdminCalendarDate, setCurrentSuperAdminCalendarDate] = useState(new Date());
   const [superAdminCalendarView, setSuperAdminCalendarView] = useState<'days' | 'months' | 'years'>('days');
+  const [expiryExtensionTargetId, setExpiryExtensionTargetId] = useState<string | null>(null);
+  const [isExpiryExtensionPickerOpen, setIsExpiryExtensionPickerOpen] = useState(false);
+  const [currentExpiryExtensionCalendarDate, setCurrentExpiryExtensionCalendarDate] = useState(new Date());
+  const [expiryExtensionCalendarView, setExpiryExtensionCalendarView] = useState<'days' | 'months' | 'years'>('days');
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>(() => audit.list());
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>(() => audit.sessions());
   const [auditActionFilter, setAuditActionFilter] = useState<'all' | AuditEntry['action']>('all');
   const [auditUniversityFilter, setAuditUniversityFilter] = useState('all');
   const superAdminDatePickerRef = useRef<HTMLDivElement>(null);
+  const expiryExtensionPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setResultsUniversityName(activeUniversity?.name || '');
@@ -623,33 +628,34 @@ export const AdminPanel: React.FC<Props> = ({
       login: language === 'ru' ? 'Вход' : language === 'uz' ? 'Kirish' : 'Login',
       question_updated: language === 'ru' ? 'Изменение вопроса' : language === 'uz' ? 'Savol o‘zgartirildi' : 'Question updated',
       students_imported: language === 'ru' ? 'Импорт студентов' : language === 'uz' ? 'Talabalar importi' : 'Students imported',
-      university_key_rotated: language === 'ru' ? 'Ротация ключа' : language === 'uz' ? 'Kalit almashtirildi' : 'Key rotated',
+      university_key_rotated: language === 'ru' ? 'Продление срока' : language === 'uz' ? 'Muddat uzaytirildi' : 'Expiry extended',
       session_revoked: language === 'ru' ? 'Сессия отозвана' : language === 'uz' ? 'Sessiya bekor qilindi' : 'Session revoked',
     };
     return labels[action];
   };
 
-  const rotateUniversityKey = (university: University) => {
-    const values = new Uint32Array(8);
-    crypto.getRandomValues(values);
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const nextKey = `UNI-${Array.from(values).map((value) => chars[value % chars.length]).join('')}`;
-    const updated = storage.rotateUniversityKey(university.id, nextKey);
+  const openUniversityExpiryPicker = (university: University) => {
+    const monthDate = university.expiresAt ? new Date(university.expiresAt) : new Date();
+    setExpiryExtensionTargetId(university.id);
+    setCurrentExpiryExtensionCalendarDate(monthDate);
+    setExpiryExtensionCalendarView('days');
+    setIsExpiryExtensionPickerOpen(true);
+  };
+
+  const applyUniversityExpiryDate = (university: University, dateStr: string) => {
+    const parsedDate = new Date(dateStr + 'T23:59:59');
+    if (Number.isNaN(parsedDate.getTime())) return;
+
+    const updated = storage.extendUniversityExpiry(university.id, parsedDate.toISOString());
     if (!updated) {
-      alert(language === 'ru' ? 'Не удалось обновить ключ.' : 'Kalitni yangilab bo‘lmadi.');
+      alert(language === 'ru' ? 'Не удалось обновить срок доступа.' : 'Kirish muddati yangilanmadi.');
       return;
     }
+
     setUniversities(storage.getUniversities());
-    try {
-      const savedPasswords = JSON.parse(localStorage.getItem('saved_university_password_values_v1') || '{}') as Record<string, string>;
-      if (savedPasswords[university.id]) {
-        savedPasswords[university.id] = security.encryptField(nextKey);
-        localStorage.setItem('saved_university_password_values_v1', JSON.stringify(savedPasswords));
-      }
-    } catch {
-      // Ignore unavailable local storage.
-    }
-    audit.record('university_key_rotated', 'superadmin', university.id, `key rotated from ${university.key}`);
+    setIsExpiryExtensionPickerOpen(false);
+    setExpiryExtensionTargetId(null);
+    audit.record('university_key_rotated', 'superadmin', university.id, `expiry extended to ${dateStr}`);
     refreshAuditState();
   };
 
@@ -1017,6 +1023,11 @@ export const AdminPanel: React.FC<Props> = ({
       if (superAdminDatePickerRef.current && !superAdminDatePickerRef.current.contains(e.target as Node)) {
         setIsSuperAdminDatePickerOpen(false);
         setSuperAdminCalendarView('days');
+      }
+      if (expiryExtensionPickerRef.current && !expiryExtensionPickerRef.current.contains(e.target as Node)) {
+        setIsExpiryExtensionPickerOpen(false);
+        setExpiryExtensionTargetId(null);
+        setExpiryExtensionCalendarView('days');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -2339,7 +2350,7 @@ export const AdminPanel: React.FC<Props> = ({
                           const isEditingBranding = editingUniId === uni.id;
 
                           return (
-                            <div key={uni.id} className="border border-bento-border rounded-xl bg-bento-card overflow-hidden transition-all shadow-sm">
+                            <div key={uni.id} className="border border-bento-border rounded-xl bg-bento-card overflow-visible transition-all shadow-sm">
                               <div
                                 className={cn(
                                   "p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 group",
@@ -2447,13 +2458,162 @@ export const AdminPanel: React.FC<Props> = ({
                                     {language === 'ru' ? 'Копировать' : 'Nusxa'}
                                   </button>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => rotateUniversityKey(uni)}
-                                    className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-[10px] rounded-lg transition-all uppercase tracking-wider border border-amber-500/20 cursor-pointer"
-                                  >
-                                    {language === 'ru' ? 'Новый ключ' : 'Yangi kalit'}
-                                  </button>
+                                  <div ref={expiryExtensionPickerRef} className="relative inline-block">
+                                    <button
+                                      type="button"
+                                      onClick={() => openUniversityExpiryPicker(uni)}
+                                      className="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-[10px] rounded-lg transition-all uppercase tracking-wider border border-amber-500/20 cursor-pointer"
+                                    >
+                                      {language === 'ru' ? 'Дата' : language === 'uz' ? 'Sana' : 'Date'}
+                                    </button>
+
+                                    {isExpiryExtensionPickerOpen && expiryExtensionTargetId === uni.id && (
+                                      <div className="absolute right-0 top-full mt-2 z-[110] w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] p-4">
+                                        <div className="flex items-center justify-between mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                                          <button
+                                            type="button"
+                                            onClick={() => setCurrentExpiryExtensionCalendarDate(new Date(currentExpiryExtensionCalendarDate.getFullYear(), currentExpiryExtensionCalendarDate.getMonth() - 1))}
+                                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                                          >
+                                            <ChevronLeft size={16} />
+                                          </button>
+
+                                          <div className="flex gap-1 items-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => setExpiryExtensionCalendarView(expiryExtensionCalendarView === 'months' ? 'days' : 'months')}
+                                              className={cn(
+                                                'text-xs font-black uppercase tracking-wider px-2 py-1 rounded-lg transition-all cursor-pointer',
+                                                expiryExtensionCalendarView === 'months' ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-[#4f46e5]' : 'text-[#1e293b] dark:text-[#f8fafc] hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                              )}
+                                            >
+                                              {currentExpiryExtensionCalendarDate.toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { month: 'long' })}
+                                            </button>
+                                            <span className="text-zinc-300 dark:text-zinc-700 text-xs font-bold">/</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => setExpiryExtensionCalendarView(expiryExtensionCalendarView === 'years' ? 'days' : 'years')}
+                                              className={cn(
+                                                'text-xs font-black uppercase tracking-wider px-2 py-1 rounded-lg transition-all cursor-pointer',
+                                                expiryExtensionCalendarView === 'years' ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-[#4f46e5]' : 'text-[#1e293b] dark:text-[#f8fafc] hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                              )}
+                                            >
+                                              {currentExpiryExtensionCalendarDate.getFullYear()}
+                                            </button>
+                                          </div>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => setCurrentExpiryExtensionCalendarDate(new Date(currentExpiryExtensionCalendarDate.getFullYear(), currentExpiryExtensionCalendarDate.getMonth() + 1))}
+                                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                                          >
+                                            <ChevronRight size={16} />
+                                          </button>
+                                        </div>
+
+                                        {expiryExtensionCalendarView === 'days' && (
+                                          <>
+                                            <div className="grid grid-cols-7 gap-1 mb-2">
+                                              {['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'].map((day) => (
+                                                <div key={day} className="text-[10px] font-bold text-center text-zinc-400 uppercase tracking-wider">
+                                                  {day}
+                                                </div>
+                                              ))}
+                                            </div>
+                                            <div className="grid grid-cols-7 gap-1">
+                                              {(() => {
+                                                const year = currentExpiryExtensionCalendarDate.getFullYear();
+                                                const month = currentExpiryExtensionCalendarDate.getMonth();
+                                                const firstDay = new Date(year, month, 1).getDay();
+                                                const shift = firstDay === 0 ? 6 : firstDay - 1;
+                                                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                                                const prevMonthDays = new Date(year, month, 0).getDate();
+                                                const items: React.ReactNode[] = [];
+
+                                                for (let i = shift - 1; i >= 0; i--) {
+                                                  items.push(
+                                                    <div key={`prev-${i}`} className="h-8 flex items-center justify-center text-xs font-bold text-zinc-350 dark:text-zinc-650">
+                                                      {prevMonthDays - i}
+                                                    </div>
+                                                  );
+                                                }
+
+                                                for (let d = 1; d <= daysInMonth; d++) {
+                                                  const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                                  const isSelected = uni.expiresAt && new Date(uni.expiresAt).toISOString().slice(0, 10) === dateStr;
+                                                  items.push(
+                                                    <button
+                                                      key={d}
+                                                      type="button"
+                                                      onClick={() => applyUniversityExpiryDate(uni, dateStr)}
+                                                      className={cn(
+                                                        'h-8 w-full rounded-xl flex items-center justify-center text-xs font-bold transition-all cursor-pointer',
+                                                        isSelected ? 'bg-[#4f46e5] text-white shadow-lg shadow-indigo-600/35' : 'text-zinc-800 dark:text-zinc-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/20'
+                                                      )}
+                                                    >
+                                                      {d}
+                                                    </button>
+                                                  );
+                                                }
+
+                                                return items;
+                                              })()}
+                                            </div>
+                                          </>
+                                        )}
+
+                                        {expiryExtensionCalendarView === 'months' && (
+                                          <div className="grid grid-cols-3 gap-2 py-1">
+                                            {Array.from({ length: 12 }).map((_, i) => {
+                                              const monthName = new Date(2000, i, 1).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { month: 'short' });
+                                              const isSelected = currentExpiryExtensionCalendarDate.getMonth() === i;
+                                              return (
+                                                <button
+                                                  key={i}
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setCurrentExpiryExtensionCalendarDate(new Date(currentExpiryExtensionCalendarDate.getFullYear(), i, 1));
+                                                    setExpiryExtensionCalendarView('days');
+                                                  }}
+                                                  className={cn(
+                                                    'rounded-xl px-2 py-2 text-xs font-bold transition-all cursor-pointer',
+                                                    isSelected ? 'bg-indigo-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/20'
+                                                  )}
+                                                >
+                                                  {monthName}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+
+                                        {expiryExtensionCalendarView === 'years' && (
+                                          <div className="grid grid-cols-3 gap-2 py-1">
+                                            {Array.from({ length: 12 }).map((_, idx) => {
+                                              const year = currentExpiryExtensionCalendarDate.getFullYear() - 5 + idx;
+                                              const isSelected = currentExpiryExtensionCalendarDate.getFullYear() === year;
+                                              return (
+                                                <button
+                                                  key={year}
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setCurrentExpiryExtensionCalendarDate(new Date(year, currentExpiryExtensionCalendarDate.getMonth(), 1));
+                                                    setExpiryExtensionCalendarView('days');
+                                                  }}
+                                                  className={cn(
+                                                    'rounded-xl px-2 py-2 text-xs font-bold transition-all cursor-pointer',
+                                                    isSelected ? 'bg-indigo-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/20'
+                                                  )}
+                                                >
+                                                  {year}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
 
                                   <button
                                     type="button"
