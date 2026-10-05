@@ -40,8 +40,16 @@ const readLegacyMedia = (): StoredMedia[] => {
   try {
     const raw = localStorage.getItem(LEGACY_MEDIA_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as StoredMedia[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is StoredMedia =>
+      !!item &&
+      typeof item === 'object' &&
+      typeof item.id === 'string' &&
+      typeof item.url === 'string' &&
+      typeof item.name === 'string' &&
+      (item.type === 'image' || item.type === 'model'),
+    );
   } catch {
     return [];
   }
@@ -97,8 +105,8 @@ export const mediaStore = {
     if (stored?.dataUrl) return stored.dataUrl;
 
     const legacy = readLegacyMedia();
-    const match = legacy.find((item) => item.id === id || item.url === value);
-    if (match && (match.url.startsWith('data:') || match.url.startsWith('blob:'))) {
+    const match = legacy.find((item) => item?.id === id || item?.url === value);
+    if (match?.url && (match.url.startsWith('data:') || match.url.startsWith('blob:'))) {
       return match.url;
     }
 

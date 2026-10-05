@@ -20,7 +20,12 @@ interface Props {
 
 export const AdminAuth: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
   const t = useTranslation(language);
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(() => {
+    const currentUniversity = storage.getCurrentUniversity();
+    return currentUniversity
+      ? security.getRememberedUniversityPassword(currentUniversity.id)
+      : '';
+  });
   const [error, setError] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,11 +38,7 @@ export const AdminAuth: React.FC<Props> = ({ onLogin, language, setLanguage }) =
     setIsSubmitting(true);
     const rateLimit = adminRateLimit.canAttempt();
     if (!rateLimit.allowed) {
-      setErrorMsg(language === 'ru'
-        ? 'Слишком много попыток. Повторите через минуту.'
-        : language === 'uz'
-          ? 'Juda ko‘p urinish. Bir daqiqadan keyin qayta urinib ko‘ring.'
-          : 'Too many attempts. Try again in one minute.');
+      setErrorMsg(t.adminTooManyAttempts);
       setError(true);
       setIsSubmitting(false);
       return;
@@ -50,11 +51,7 @@ export const AdminAuth: React.FC<Props> = ({ onLogin, language, setLanguage }) =
     if (!result.ok) {
       adminRateLimit.recordFailure();
       if (result.reason === 'expired') {
-        setErrorMsg(
-          language === 'ru'
-            ? 'Срок действия этого ключа истек!'
-            : 'Ushbu kalitning amal qilish muddati tugagan!',
-        );
+        setErrorMsg(t.adminKeyExpired);
       } else {
         setErrorMsg('');
       }
@@ -150,7 +147,7 @@ export const AdminAuth: React.FC<Props> = ({ onLogin, language, setLanguage }) =
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      autoComplete="new-password"
+                      autoComplete="current-password"
                       className="flex-1 bg-transparent outline-none font-mono text-lg text-bento-text-main placeholder:text-bento-text-muted/30"
                     />
                   </div>

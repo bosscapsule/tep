@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ErrorInfo, type ReactNode } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { AdminAuth } from '../components/AdminAuth';
 import { AdminPanel } from '../components/AdminPanel';
@@ -7,6 +7,57 @@ import { useAppShell } from './useAppShell';
 import { EntryScreen } from './EntryScreen';
 import { storage } from '../lib/storage';
 import { audit } from '../lib/audit';
+
+interface StudentModeBoundaryProps {
+  children: ReactNode;
+  onExit: () => void;
+  errorHeading: string;
+  backLabel: string;
+}
+
+interface StudentModeBoundaryState {
+  error: Error | null;
+  componentStack: string;
+}
+
+class StudentModeErrorBoundary extends React.Component<
+  StudentModeBoundaryProps,
+  StudentModeBoundaryState
+> {
+  state: StudentModeBoundaryState = { error: null, componentStack: '' };
+
+  static getDerivedStateFromError(error: Error): StudentModeBoundaryState {
+    return { error, componentStack: '' };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Student mode render failed:', error, errorInfo);
+    this.setState({ componentStack: errorInfo.componentStack || '' });
+  }
+
+  render() {
+    const { error } = this.state;
+    if (!error) return this.props.children;
+
+    return (
+      <main className="min-h-screen bg-bento-bg text-bento-text-main flex items-center justify-center p-6">
+        <section className="w-full max-w-xl rounded-2xl border border-red-500/30 bg-bento-card p-6 shadow-xl">
+          <h1 className="text-lg font-bold text-red-500">{this.props.errorHeading}</h1>
+          <pre className="mt-4 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-bento-bg p-4 text-sm">
+            {[error.message, error.stack, this.state.componentStack].filter(Boolean).join('\n')}
+          </pre>
+          <button
+            type="button"
+            onClick={this.props.onExit}
+            className="mt-5 rounded-xl bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
+          >
+            {this.props.backLabel}
+          </button>
+        </section>
+      </main>
+    );
+  }
+}
 
 export function AppShell() {
   const {
@@ -95,14 +146,20 @@ export function AppShell() {
         )}
 
         {view === 'student' && (
-          <StudentMode
+          <StudentModeErrorBoundary
             key="student"
-            language={language}
-            setLanguage={setLanguage}
             onExit={() => setView('entry')}
-            theme={theme}
-            toggleTheme={toggleTheme}
-          />
+            errorHeading={t.studentModeError}
+            backLabel={t.goBack}
+          >
+            <StudentMode
+              language={language}
+              setLanguage={setLanguage}
+              onExit={() => setView('entry')}
+              theme={theme}
+              toggleTheme={toggleTheme}
+            />
+          </StudentModeErrorBoundary>
         )}
       </AnimatePresence>
     </div>

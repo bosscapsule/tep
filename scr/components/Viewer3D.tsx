@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import { Maximize2, MousePointer2, RotateCw, Trash2, Eye, EyeOff, RefreshCcw, Box, Sun, Moon, AlertOctagon, Paintbrush, Pin, X, Check, Edit2, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { mediaStore } from '../lib/mediaStore';
+import { useTranslation } from '../i18n';
 
 // Maps a given model URL or base64 data string to a small, safe, unique storage key.
 // This prevents QuotaExceededError when using massive data URIs or long names as JSON keys inside localStorage.
@@ -16,8 +17,8 @@ const getModelStorageKey = (modelId: string): string => {
   try {
     const savedMedia = localStorage.getItem('tester_pro_media');
     if (savedMedia) {
-      const parsed = JSON.parse(savedMedia) as { id: string; url: string }[];
-      const item = parsed.find(m => m.url === modelId || m.id === modelId);
+      const parsed = JSON.parse(savedMedia) as ({ id: string; url: string } | null)[];
+      const item = parsed.find(m => m?.url === modelId || m?.id === modelId);
       if (item) return item.id;
     }
   } catch (e) {
@@ -39,7 +40,7 @@ const getModelStorageKey = (modelId: string): string => {
 
 // React Error Boundary to catch loading and visualizer issues gracefully inside React Three Fiber
 class ErrorBoundary extends Component<
-  { fallback: React.ReactNode; children: React.ReactNode },
+  { fallback: (error: Error | null) => React.ReactNode; children: React.ReactNode },
   { hasError: boolean; error: Error | null }
 > {
   constructor(props: any) {
@@ -57,7 +58,7 @@ class ErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
-      return this.props.fallback;
+      return this.props.fallback(this.state.error);
     }
     return this.props.children;
   }
@@ -119,6 +120,7 @@ function CustomAnnotationMarker({
   onLabelDragEnd: () => void;
   isDraggingLabel: boolean;
 }) {
+  const t = useTranslation(language);
   const { camera } = useThree();
   
   const labelText = useMemo(() => {
@@ -307,7 +309,7 @@ function CustomAnnotationMarker({
                   onDelete();
                 }}
                 className="ml-2 p-0.5 rounded hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-all cursor-pointer"
-                title={language === 'en' ? 'Delete pin' : language === 'ru' ? 'Удалить отметку' : 'Belgini o‘chirish'}
+                title={t.deletePin}
               >
                 <Trash2 size={10} />
               </button>
@@ -909,7 +911,7 @@ interface Viewer3DProps {
 }
 
 export default function Viewer3D({ 
-  activeModel, 
+  activeModel: activeModelValue,
   highlightPart, 
   onModelChange, 
   onPartClick,
@@ -928,16 +930,43 @@ export default function Viewer3D({
   blenderLoopMode = false,
   studentMode = false
 }: Viewer3DProps) {
-  const [resolvedActiveModel, setResolvedActiveModel] = useState(activeModel);
+  const t = useTranslation(language);
+  const activeModel = typeof activeModelValue === 'string' ? activeModelValue : '';
+  const [mediaResolution, setMediaResolution] = useState<{
+    source: string;
+    url: string;
+    missing: boolean;
+  } | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [localShowGrid, setLocalShowGrid] = useState(showGrid && !studentMode);
   const [pureWhiteBg, setPureWhiteBg] = useState(false);
   const [localLanguage, setLocalLanguage] = useState<'uz' | 'ru' | 'en'>(language);
   const orbitRef = useRef<any>(null);
+  const resolutionMatches = mediaResolution !== null && mediaResolution.source === activeModel;
+  const resolvedActiveModel = resolutionMatches ? mediaResolution.url : activeModel;
+  const missingModel = resolutionMatches && mediaResolution.missing;
+  const isResolvingModel = activeModel.startsWith('media:') && !resolutionMatches;
 
   useEffect(() => {
     let cancelled = false;
     void mediaStore.resolve(activeModel).then((resolved) => {
-      if (!cancelled) setResolvedActiveModel(resolved || activeModel);
+      if (cancelled) return;
+      const isMissing = activeModel.startsWith('media:') && !resolved;
+      setMediaResolution({
+        source: activeModel,
+        url: resolved || (isMissing ? '' : activeModel),
+        missing: isMissing,
+      });
+    }).catch((error) => {
+      console.error('Failed to resolve 3D model:', error);
+      if (!cancelled) {
+        const isMissing = activeModel.startsWith('media:');
+        setMediaResolution({
+          source: activeModel,
+          url: isMissing ? '' : activeModel,
+          missing: isMissing,
+        });
+      }
     });
     return () => { cancelled = true; };
   }, [activeModel]);
@@ -1366,8 +1395,10 @@ export default function Viewer3D({
       pureWhiteBg
         ? "bg-white"
         : theme === 'dark' 
-          ? "bg-[#0F1115] [background:radial-gradient(circle_at_center,#1A1D23_0%,#0F1115_100%)]" 
-          : "bg-slate-50 [background:radial-gradient(circle_at_center,#ffffff_0%,#f1f5f9_100%)]"
+          ? "bg-[#0f172a]"
+          : studentMode
+            ? "bg-white"
+            : "bg-slate-50 [background:radial-gradient(circle_at_center,#ffffff_0%,#f1f5f9_100%)]"
     )}>
       {/* Top Controls */}
       {!studentMode && <div className={cn(
@@ -1382,7 +1413,7 @@ export default function Viewer3D({
             "w-9 h-9 flex items-center justify-center transition-colors rounded-lg", 
             theme === 'dark' ? "text-[#9CA3AF] hover:text-[#3B82F6]" : "text-[#64748B] hover:text-indigo-600 hover:bg-slate-100"
           )} 
-          title="Reset Rotation"
+          title={t.viewerResetRotation}
         >
           <RotateCw size={18} />
         </button>
@@ -1395,7 +1426,7 @@ export default function Viewer3D({
               ? (theme === 'dark' ? "text-[#3B82F6] bg-[#3B82F6]/10" : "text-indigo-600 bg-indigo-50")
               : (theme === 'dark' ? "text-[#9CA3AF] hover:text-[#3B82F6]" : "text-[#64748B] hover:text-indigo-600 hover:bg-slate-100")
           )} 
-          title={language === 'ru' ? 'Режим инспектирования' : 'Ko‘rish rejimi'}
+          title={t.viewerInspectMode}
         >
           <MousePointer2 size={18} />
         </button>
@@ -1408,7 +1439,7 @@ export default function Viewer3D({
               ? (theme === 'dark' ? "text-[#10b981] bg-[#10b981]/10" : "text-emerald-600 bg-emerald-50")
               : (theme === 'dark' ? "text-[#9CA3AF] hover:text-[#10b981]" : "text-[#64748B] hover:text-emerald-600 hover:bg-slate-100")
           )} 
-          title={language === 'ru' ? 'Покраска областей' : 'Ranglash asbobi'}
+          title={t.viewerPaintRegions}
         >
           <Paintbrush size={18} />
         </button>
@@ -1421,7 +1452,7 @@ export default function Viewer3D({
               ? (theme === 'dark' ? "text-[#a855f7] bg-[#a855f7]/10" : "text-purple-600 bg-purple-50")
               : (theme === 'dark' ? "text-[#9CA3AF] hover:text-[#a855f7]" : "text-[#64748B] hover:text-purple-600 hover:bg-slate-100")
           )} 
-          title={language === 'ru' ? 'Добавить 3D стрелку/подпись' : '3D strelka va nom qo‘shish'}
+          title={t.viewerAddAnnotation}
         >
           <Pin size={18} />
         </button>
@@ -1433,7 +1464,7 @@ export default function Viewer3D({
               ? (theme === 'dark' ? 'text-[#3B82F6] bg-[#3B82F6]/10' : 'text-indigo-600 bg-indigo-50') 
               : (theme === 'dark' ? 'text-[#9CA3AF] hover:text-[#3B82F6]' : 'text-[#64748B] hover:text-indigo-600 hover:bg-slate-100')
           )} 
-          title="Toggle Grid"
+          title={t.viewerToggleGrid}
         >
           {localShowGrid ? <Eye size={18} /> : <EyeOff size={18} />}
         </button>
@@ -1445,7 +1476,7 @@ export default function Viewer3D({
               ? "text-amber-500 bg-amber-500/10" 
               : (theme === 'dark' ? "text-[#9CA3AF] hover:text-[#3B82F6]" : "text-[#64748B] hover:text-indigo-600 hover:bg-slate-100")
           )} 
-          title={language === 'uz' ? "Fonni o‘zgartirish" : "Переключение фона"}
+          title={t.viewerChangeBackground}
         >
           {pureWhiteBg ? <Sun size={18} /> : <Moon size={18} />}
         </button>
@@ -1453,39 +1484,55 @@ export default function Viewer3D({
 
       {/* Main Surface */}
       <div className="absolute inset-0 cursor-grab active:cursor-grabbing">
-        <ErrorBoundary 
-          fallback={
+        {isResolvingModel ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 text-xs text-zinc-400">
+            {t.viewerLoadingModel}
+          </div>
+        ) : missingModel ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-zinc-950/95 p-6 text-center text-zinc-300">
+            <AlertOctagon className="text-amber-400" size={28} />
+            <h4 className="text-xs font-bold uppercase text-amber-400">
+              {t.viewerModelNotFound}
+            </h4>
+            <p className="max-w-xs text-xs text-zinc-400">
+              {t.viewerMissingModelDescription}
+            </p>
+          </div>
+        ) : <ErrorBoundary
+          key={`${activeModel}:${retryKey}`}
+          fallback={(error) => {
+            const message = error?.message
+              .replace(/(?:data|blob):[^\s]+/g, '[media URL]')
+              .slice(0, 160);
+            return (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/95 rounded-2xl p-6 text-center border border-red-900/30 z-[100]">
               <AlertOctagon className="text-red-500 mb-2 animate-pulse" size={28} />
               <h4 className="text-[11px] font-black uppercase text-red-500 tracking-widest leading-none mb-1.5 font-sans">
-                {language === 'ru' ? 'ОШИБКА 3D ВИЗУАЛИЗАЦИИ' : '3D VIZUALIZATSIYA XATOLIGI'}
+                {t.viewerErrorTitle}
               </h4>
               <p className="text-[10px] text-zinc-500 max-w-[200px] leading-tight mb-4 font-sans">
-                {language === 'ru' 
-                  ? 'Не удалось загрузить или отобразить этот 3D файл.' 
-                  : 'Ushbu 3D faylni yuklash yoki ko‘rsatish imkoni bo‘lmadi.'}
+                {t.viewerErrorDescription}
               </p>
+              {message && <p className="mb-3 max-w-xs break-words text-[10px] text-zinc-500">{message}</p>}
               <button 
                 onClick={() => {
-                  try {
-                    localStorage.removeItem('tester_pro_3d_labels');
-                    localStorage.removeItem('tester_pro_3d_pins');
-                  } catch (e) {}
-                  window.location.reload();
+                  if (!isBuiltIn) useGLTF.clear(resolvedActiveModel);
+                  setRetryKey((current) => current + 1);
                 }}
                 className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg transition-all cursor-pointer"
               >
-                {language === 'ru' ? 'Сбросить' : 'Qayta yuklash'}
+                {t.viewerRetryLoading}
               </button>
             </div>
-          }
+            );
+          }}
         >
           <Canvas
             shadows={!studentMode}
             dpr={studentMode ? [1, 1.5] : undefined}
             gl={{ localClippingEnabled: true, powerPreference: 'low-power' }}
           >
-            <PerspectiveCamera makeDefault position={[0, 0, 4.5]} fov={50} />
+            <PerspectiveCamera makeDefault position={[0, 0, 1]} fov={50} />
             
             {/* Preset Lights */}
             {lightingPreset === 'clinical' && (
@@ -1515,7 +1562,7 @@ export default function Viewer3D({
             )}
             
             <Suspense fallback={null}>
-              <Center top>
+              <Center>
                 <group>
                   <group 
                     ref={floatingGroupRef}
@@ -1566,7 +1613,7 @@ export default function Viewer3D({
                 </group>
               </Center>
               
-              {!studentMode && <Environment preset="city" />}
+              <Environment preset="city" />
               {!studentMode && (
                 <ContactShadows resolution={512} scale={15} blur={1.5} opacity={0.35} far={6} color="#000" />
               )}
@@ -1591,7 +1638,7 @@ export default function Viewer3D({
               enableRotate={true}
               enableZoom={true}
               screenSpacePanning={true}
-              minDistance={0.8}
+              minDistance={0}
               maxDistance={16}
               zoomSpeed={1.25}
               rotateSpeed={1.1}
@@ -1605,7 +1652,7 @@ export default function Viewer3D({
               enabled={!draggingAnnoId && !draggingLabelId}
             />
           </Canvas>
-        </ErrorBoundary>
+        </ErrorBoundary>}
       </div>
 
       {/* 2D HUD HUD Overlay for Blender Loop Selector */}
@@ -1628,9 +1675,7 @@ export default function Viewer3D({
           </div>
 
           <p className="text-[10px] text-zinc-300 font-semibold leading-relaxed">
-            {language === 'ru' 
-              ? 'Выбор замкнутыми петлями/циклами. Кликните деталь или используйте кнопки ниже для переключения:' 
-              : 'Loop/tsikl tanlash rejimi. O‘tish uchun qismni bosing yoki tugmalardan foydalaning:'}
+            {t.viewerLoopDescription}
           </p>
 
           <div className="flex items-center justify-between gap-2 mt-1 bg-black/40 p-1.5 rounded-lg border border-zinc-850">
@@ -1638,24 +1683,24 @@ export default function Viewer3D({
               onClick={() => handleCycleLoop(-1)}
               className="px-2.5 py-1.5 bg-zinc-900 border border-zinc-750 hover:border-indigo-500 text-zinc-300 hover:text-white rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer"
             >
-              ◀ {language === 'ru' ? 'Пред' : 'Orqaga'}
+              ◀ {t.viewerPrevious}
             </button>
 
             <span className="text-[9.5px] font-mono font-black text-indigo-400 uppercase tracking-wide text-center shrink truncate max-w-[120px]">
-              {highlightPart || (language === 'ru' ? 'Нет' : 'Yo‘q')}
+              {highlightPart || t.none}
             </span>
 
             <button
               onClick={() => handleCycleLoop(1)}
               className="px-2.5 py-1.5 bg-zinc-900 border border-zinc-750 hover:border-indigo-500 text-zinc-300 hover:text-white rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer"
             >
-              {language === 'ru' ? 'След' : 'Oldinga'} ▶
+              {t.viewerNext} ▶
             </button>
           </div>
 
           {loopElements.length > 0 && (
             <div className="flex flex-col gap-1 mt-1 border-t border-zinc-800/40 pt-2">
-              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{language === 'ru' ? 'Сегменты в петле:' : 'Zanjir segmentlari:'}</span>
+              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">{t.loopSegments}</span>
               <div className="flex flex-wrap items-center gap-1">
                 {loopElements.map((el) => (
                   <button 
@@ -1686,7 +1731,7 @@ export default function Viewer3D({
           theme === 'dark' ? "bg-zinc-900/95 border-zinc-800 text-white" : "bg-white/95 border-zinc-200 text-zinc-800"
         )}>
           <div className="text-[9px] font-black uppercase tracking-wider text-zinc-400">
-            🎨 {language === 'ru' ? 'ВЫБЕРИТЕ ЦВЕТ И КЛИКНИТЕ ДЕТАЛЬ' : 'RANGLASH REJIMI: DETALNI BOSING'}
+            🎨 {t.paintModeInstructions}
           </div>
           <div className="flex items-center gap-1.5 mt-1">
             {['#ef4444', '#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4', '#eab308'].map((color) => (
@@ -1715,14 +1760,10 @@ export default function Viewer3D({
           theme === 'dark' ? "bg-zinc-900/95 border-zinc-800 text-white" : "bg-white/95 border-zinc-200 text-zinc-800"
         )}>
           <div className="text-[9px] font-black uppercase tracking-widest text-indigo-400">
-            📍 {language === 'en' ? 'ADD PIN/ARROW MODE' : language === 'ru' ? 'РЕЖИМ ДОБАВЛЕНИЯ СТРЕЛОК/НАДПИСЕЙ' : 'STRELKA VA NOM QO‘SHISH REJIMI'}
+            📍 {t.annotationModeTitle}
           </div>
           <p className="text-[10px] text-zinc-400 max-w-[250px] leading-snug">
-            {language === 'en'
-              ? 'Click anywhere on the 3D model to place an arrow and add a custom label!'
-              : language === 'ru' 
-                ? 'Кликните на любую точку 3D модели, чтобы установить стрелку и добавить подпись!'
-                : 'Strelka va nomini o‘rnatish uchun 3D modelning istalgan joyini bosing!'}
+            {t.annotationModeDescription}
           </p>
         </div>
       )}
@@ -1879,7 +1920,7 @@ export default function Viewer3D({
                             "p-1 rounded text-zinc-400 hover:text-zinc-600 transition-all cursor-pointer",
                             theme === 'dark' ? "hover:bg-zinc-800" : "hover:bg-zinc-200"
                           )}
-                          title={language === 'en' ? 'Cancel' : language === 'ru' ? 'Отмена' : 'Bekor qilish'}
+                          title={t.cancel}
                         >
                           <X size={11} />
                         </button>
@@ -1891,7 +1932,7 @@ export default function Viewer3D({
                             }
                           }}
                           className="p-1 rounded bg-indigo-500/10 hover:bg-indigo-500 text-indigo-400 hover:text-white transition-all cursor-pointer"
-                          title={language === 'en' ? 'Save' : language === 'ru' ? 'Сохранить' : 'Saqlash'}
+                          title={t.save}
                         >
                           <Check size={11} />
                         </button>
@@ -1911,7 +1952,7 @@ export default function Viewer3D({
                       ? "bg-zinc-950/40 border-zinc-800/65 hover:bg-zinc-850/60 text-zinc-200" 
                       : "bg-zinc-50 border-zinc-150 hover:bg-zinc-100/80 text-zinc-700"
                   )}
-                  title={language === 'en' ? 'Click to focus' : language === 'ru' ? 'Кликните, чтобы сфокусироваться' : 'Fokuslash uchun bosing'}
+                  title={t.clickToFocus}
                 >
                   <div className="flex items-center gap-1.5 truncate mr-1">
                     <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: anno.color }} />
@@ -1929,7 +1970,7 @@ export default function Viewer3D({
                         setEditAnnoColor(anno.color);
                       }}
                       className="p-1 rounded text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all cursor-pointer"
-                      title={language === 'en' ? 'Rename pin' : language === 'ru' ? 'Переименовать' : 'Nomini o‘zgartirish'}
+                      title={t.renamePin}
                     >
                       <Edit2 size={10} />
                     </button>
@@ -1938,7 +1979,7 @@ export default function Viewer3D({
                         deleteAnnotation(anno.id);
                       }}
                       className="p-1 rounded text-zinc-400 hover:text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
-                      title={language === 'en' ? 'Delete pin' : language === 'ru' ? 'Удалить' : 'O‘chirish'}
+                      title={t.deletePin}
                     >
                       <Trash2 size={10} />
                     </button>
@@ -1959,7 +2000,7 @@ export default function Viewer3D({
           )}>
             <div className="flex items-center justify-between border-b pb-2.5" style={{ borderColor: theme === 'dark' ? '#27272a' : '#e4e4e7' }}>
               <span className="text-[11px] font-black uppercase tracking-widest text-indigo-400 flex items-center gap-1.5">
-                📍 {language === 'en' ? 'NEW 3D PIN/ARROW' : language === 'ru' ? 'НОВАЯ 3D СТРЕЛКА/ПОДПИСЬ' : 'YANGI 3D STRELKA VA NOM'}
+                📍 {t.new3dAnnotation}
               </span>
               <button 
                 onClick={() => {
@@ -1975,11 +2016,11 @@ export default function Viewer3D({
             <div className="space-y-3">
               <div className="flex flex-col gap-1">
                 <label className="text-[9px] font-black uppercase tracking-wider text-indigo-400">
-                  {localLanguage === 'en' ? 'Name in English' : localLanguage === 'ru' ? 'Название на русском' : 'Nomi o‘zbek tilida'}
+                  {localLanguage === 'en' ? t.nameInEnglish : localLanguage === 'ru' ? t.nameInRussian : t.nameInUzbek}
                 </label>
                 <input
                   type="text"
-                  placeholder={localLanguage === 'en' ? 'e.g., Frontal lobe' : localLanguage === 'ru' ? 'Например, Лобная доля' : 'Masalan, Peshona qismi'}
+                  placeholder={localLanguage === 'en' ? t.exampleFrontalLobe : localLanguage === 'ru' ? 'Например, лобная доля' : t.exampleFrontalLobe}
                   value={newAnnoName}
                   onChange={(e) => setNewAnnoName(e.target.value)}
                   className={cn(
@@ -1992,7 +2033,7 @@ export default function Viewer3D({
 
               <div className="flex flex-col gap-1">
                 <label className="text-[9px] font-black uppercase tracking-wider text-indigo-400">
-                  {localLanguage === 'en' ? 'Latin Name' : localLanguage === 'ru' ? 'Название на латыни' : 'Lotincha nomi'}
+                  {t.latinName}
                 </label>
                 <input
                   type="text"
@@ -2008,7 +2049,7 @@ export default function Viewer3D({
 
               <div className="flex flex-col gap-1">
                 <label className="text-[9px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-                  {language === 'en' ? 'Arrow & Pin Color' : language === 'ru' ? 'Цвет стрелки и подписи' : 'Strelka va belgi rangi'}
+                  {t.arrowAndPinColor}
                 </label>
                 <div className="flex items-center gap-1.5">
                   {['#ef4444', '#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#06b6d4'].map((color) => (
@@ -2039,13 +2080,13 @@ export default function Viewer3D({
                   theme === 'dark' ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-100 text-zinc-600"
                 )}
               >
-                {language === 'ru' ? 'Отмена' : 'Bekor qilish'}
+                {t.cancel}
               </button>
               <button
                 onClick={saveNewAnnotation}
                 className="px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
               >
-                {language === 'ru' ? 'Добавить' : 'Qo‘shish'}
+                {t.add}
               </button>
             </div>
           </div>

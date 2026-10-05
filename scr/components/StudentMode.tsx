@@ -61,6 +61,15 @@ type Mode =
   | "login_pinfl"
   | "confirm_pinfl";
 
+const shuffleQuestions = (questions: Question[]) => {
+  const shuffled = [...questions];
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+  return shuffled;
+};
+
 export const StudentMode: React.FC<Props> = ({
   language,
   setLanguage,
@@ -122,8 +131,13 @@ export const StudentMode: React.FC<Props> = ({
   const [lastResult, setLastResult] = useState<ExamResult | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const finishExamRef = useRef<() => void>(() => {});
+  const examFinishedRef = useRef(false);
   const settingsRef = useRef(storage.getSettings());
   const restoreHandledRef = useRef(false);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+  }, []);
 
   const [themeSearch, setThemeSearch] = useState("");
   const [groupSearch, setGroupSearch] = useState("");
@@ -280,19 +294,14 @@ export const StudentMode: React.FC<Props> = ({
     const session = storage.getInterruptedExamSession();
     if (!session) return;
 
-    const shouldRestore = window.confirm(
-      language === "ru"
-        ? "Обнаружен экзамен, прерванный из-за сбоя приложения. Восстановить его?"
-        : language === "uz"
-          ? "Ilova xatosi sabab to'xtatilgan imtihon topildi. Uni tiklaysizmi?"
-          : "An exam interrupted by an application failure was found. Restore it?",
-    );
+    const shouldRestore = window.confirm(t.interruptedExamPrompt);
 
     if (!shouldRestore) {
       storage.clearInterruptedExamSession();
       return;
     }
 
+    examFinishedRef.current = false;
     setExamQuestions(session.questions);
     setCurrentQuestionIdx(session.currentQuestionIdx);
     setStatuses(session.statuses as Record<string, QuestionStatus>);
@@ -339,10 +348,10 @@ export const StudentMode: React.FC<Props> = ({
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
         const confirmExit = confirm(
-          "Внимание! Переключение вкладок запрещено во время экзамена. Ваш результат будет аннулирован. Вы уверены?",
+          "Внимание! Переключение вкладок запрещено во время экзамена. Если продолжить, экзамен завершится с текущими ответами. Завершить экзамен?",
         );
         if (confirmExit) {
-          handleFinishExam();
+          finishExamRef.current();
         }
       }
     };
@@ -461,19 +470,19 @@ export const StudentMode: React.FC<Props> = ({
     const limit = pinflRateLimit.canAttempt();
     if (!limit.allowed) {
       const seconds = Math.ceil(limit.waitMs / 1000);
-      setPinflError(`Слишком много попыток. Подождите ${seconds} сек.`);
+      setPinflError(t.pinflRateLimit.replace('{seconds}', String(seconds)));
       return;
     }
 
     if (pinflValue.length !== 14) {
-      setPinflError("Введите 14 цифр ПИНФЛ");
+      setPinflError(t.pinflMustBe14Digits);
       return;
     }
 
     const student = students.find((s) => s.pinfl === pinflValue);
     if (!student) {
       pinflRateLimit.recordFailure();
-      setPinflError("Студент с таким ПИНФЛ не найден");
+      setPinflError(t.pinflStudentNotFound);
       return;
     }
 
@@ -482,7 +491,11 @@ export const StudentMode: React.FC<Props> = ({
     // Found student, now find active scheduled exam
     const settings = storage.getSettings();
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
+    const todayStr = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-");
     const currentTime = now.getHours() * 60 + now.getMinutes();
 
     const activeExams = (settings.scheduledExams || []).filter((exam) => {
@@ -501,7 +514,7 @@ export const StudentMode: React.FC<Props> = ({
     });
 
     if (activeExams.length === 0) {
-      setPinflError("Для вашей группы сейчас нет активных экзаменов");
+      setPinflError(t.noActiveExamForGroup);
       return;
     }
 
@@ -522,7 +535,7 @@ export const StudentMode: React.FC<Props> = ({
       );
 
     if (questions.length === 0) {
-      setPinflError(`Нет вопросов для темы "${exam.theme}"`);
+      setPinflError(t.noQuestionsForTheme.replace('{theme}', exam.theme));
       return;
     }
 
@@ -533,7 +546,7 @@ export const StudentMode: React.FC<Props> = ({
 
   const handleConnectUniversity = async () => {
     if (!connectKey.trim()) {
-      setConnectError(language === "ru" ? "Введите ключ университета" : "Universitet kalitini kiriting");
+      setConnectError(t.enterUniversityKey);
       return;
     }
 
@@ -566,13 +579,7 @@ export const StudentMode: React.FC<Props> = ({
       );
       if (matched) {
         if (matched.expiresAt && new Date(matched.expiresAt).getTime() < Date.now()) {
-          setConnectError(
-            language === "ru"
-              ? "Срок действия ключа университета истек"
-              : language === "uz"
-                ? "Universitet kalitining amal qilish muddati tugagan"
-                : "The university key has expired",
-          );
+          setConnectError(t.universityKeyExpired);
           return;
         }
 
@@ -617,11 +624,11 @@ export const StudentMode: React.FC<Props> = ({
         const activeSettings = storage.getSettings();
         setMode(activeSettings.registrationMode === "pinfl" ? "login_pinfl" : "select_theme");
       } else {
-        setConnectError(language === "ru" ? "Университет с таким ключом не найден в системе" : "Bunday kalitli universitet tizimda topilmadi");
+        setConnectError(t.universityKeyNotFound);
       }
     } catch (err) {
       console.error(err);
-      setConnectError(language === "ru" ? "Ошибка подключения. Проверьте сеть." : "Ulanish xatosi. Tarmoqni tekshiring.");
+      setConnectError(t.connectionError);
     } finally {
       setIsConnecting(false);
     }
@@ -646,12 +653,10 @@ export const StudentMode: React.FC<Props> = ({
   ) => {
     storage.clearInterruptedExamSession();
     const s = storage.getSettings();
-    let processed = [...questions];
+    const processed = s.randomizeQuestions ? shuffleQuestions(questions) : questions;
 
-    if (s.randomizeQuestions) {
-      processed = processed.sort(() => Math.random() - 0.5);
-    }
-
+    if (timerRef.current) clearInterval(timerRef.current);
+    examFinishedRef.current = false;
     setExamQuestions(processed.slice(0, 25));
     setCurrentQuestionIdx(0);
     setAnswers({});
@@ -660,7 +665,6 @@ export const StudentMode: React.FC<Props> = ({
     setTimeLeft(s.timerMinutes * 60);
     setMode("exam");
 
-    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -685,13 +689,11 @@ export const StudentMode: React.FC<Props> = ({
 
     const s = settingsRef.current;
     storage.clearInterruptedExamSession();
-    let processed = [...allQuestions];
-
     // Shuffle strictly within the selected theme questions
-    if (s.randomizeQuestions) {
-      processed = processed.sort(() => Math.random() - 0.5);
-    }
+    const processed = s.randomizeQuestions ? shuffleQuestions(allQuestions) : allQuestions;
 
+    if (timerRef.current) clearInterval(timerRef.current);
+    examFinishedRef.current = false;
     setExamQuestions(processed.slice(0, 25)); // Optional: user mentioned 25 questions
     setCurrentQuestionIdx(0);
     setAnswers({});
@@ -700,11 +702,10 @@ export const StudentMode: React.FC<Props> = ({
     setTimeLeft(s.timerMinutes * 60);
     setMode("exam");
 
-    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          handleFinishExam();
+          finishExamRef.current();
           return 0;
         }
         return prev - 1;
@@ -713,7 +714,12 @@ export const StudentMode: React.FC<Props> = ({
   };
 
   const handleFinishExam = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (examFinishedRef.current) return;
+    examFinishedRef.current = true;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     storage.clearInterruptedExamSession();
 
     let correctCount = 0;
@@ -721,7 +727,12 @@ export const StudentMode: React.FC<Props> = ({
       const expectedAnswer = q.type === "find_on_model"
         ? (q.targetPart || q.correctAnswer)
         : q.correctAnswer;
-      if (answers[q.id] === expectedAnswer) {
+      const actualAnswer = answers[q.id] || "";
+      const isCorrect = q.type === "multiple"
+        ? actualAnswer.split(",").map((answer) => answer.trim()).sort().join(",") ===
+          expectedAnswer.split(",").map((answer) => answer.trim()).sort().join(",")
+        : actualAnswer === expectedAnswer;
+      if (isCorrect) {
         correctCount++;
       }
     });
@@ -760,15 +771,27 @@ export const StudentMode: React.FC<Props> = ({
   finishExamRef.current = handleFinishExam;
 
   const currentQuestion = examQuestions[currentQuestionIdx] || null;
-  const [resolvedImageUrl, setResolvedImageUrl] = useState('');
+  const imageSource = currentQuestion?.imageUrl;
+  const [resolvedImage, setResolvedImage] = useState<{ source: string; url: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void mediaStore.resolve(currentQuestion?.imageUrl).then((url) => {
-      if (!cancelled) setResolvedImageUrl(url);
+    if (!imageSource) {
+      setResolvedImage(null);
+      return;
+    }
+
+    setResolvedImage(null);
+    void mediaStore.resolve(imageSource).then((url) => {
+      if (!cancelled) setResolvedImage({ source: imageSource, url });
+    }).catch((error) => {
+      console.error("Failed to resolve question image:", error);
+      if (!cancelled) setResolvedImage({ source: imageSource, url: "" });
     });
     return () => { cancelled = true; };
-  }, [currentQuestion?.imageUrl]);
+  }, [imageSource]);
+  const resolvedImageUrl =
+    resolvedImage && resolvedImage.source === imageSource ? resolvedImage.url : "";
 
   const is3DActive = !!(
     currentQuestion &&
@@ -780,8 +803,6 @@ export const StudentMode: React.FC<Props> = ({
     settingsRef.current.showImages &&
     resolvedImageUrl
   );
-  const isMediaActive = is3DActive;
-
   const handleSelectAnswer = (ansId: string) => {
     if (!currentQuestion) return;
     if (currentQuestion.type === "multiple") {
@@ -831,11 +852,11 @@ export const StudentMode: React.FC<Props> = ({
           <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-4">
             <GraduationCap size={48} className="text-indigo-500 animate-pulse" />
             <p className="text-sm font-bold text-zinc-500">
-              {language === 'uz' ? 'Savollar yuklanmoqda...' : language === 'ru' ? 'Загрузка вопросов...' : 'Loading questions...'}
+              {t.studentLoading}
             </p>
           </div>
         ) : (
-          <div className="w-full h-screen bg-bento-bg flex min-h-0 overflow-hidden selection:bg-indigo-500/30 overflow-x-hidden">
+          <div className="relative w-full h-screen bg-bento-bg flex min-h-0 overflow-hidden selection:bg-indigo-500/30 overflow-x-hidden">
           <SideNav
             user={{
               id: selectedStudent?.id,
@@ -877,194 +898,64 @@ export const StudentMode: React.FC<Props> = ({
 
           <div
             className={cn(
-              "flex-1 flex min-h-0 overflow-hidden transition-none relative",
-              is3DActive
-                ? "flex-row"
-                : "flex-col items-stretch justify-center bg-bento-bg overflow-hidden p-0",
+              "flex-1 min-w-0 flex min-h-0 overflow-hidden transition-none relative pl-60",
+              "flex-col items-stretch justify-center bg-bento-bg overflow-hidden py-0 pr-0",
             )}
           >
             <div
               className={cn(
-                "transition-all duration-500 flex min-w-0 min-h-0 w-full overflow-y-auto overflow-x-hidden",
-                isMediaActive ? "flex-col flex-1 relative" : "w-full flex-1 min-h-0 flex-col items-center justify-center",
+                "w-full flex-1 min-h-0 flex flex-col items-center justify-center overflow-hidden",
               )}
             >
-              {isMediaActive ? (
-                <div className={cn(
-                  "w-full max-w-[760px] mx-auto flex-1 overflow-hidden flex flex-col min-h-0",
-                )}>
-                  {is3DActive && (
-                    <div
-                      className={cn(
-                        "w-full relative overflow-hidden transition-all duration-500 bg-white",
-                        "flex-1 min-h-[260px] bg-zinc-50 dark:bg-zinc-900"
-                      )}
-                    >
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={currentQuestion.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="absolute inset-0 flex gap-3 p-3 flex-col"
-                        >
-                          <Viewer3D
-                            activeModel={
-                              currentQuestion.modelId as string
-                            }
-                            highlightPart={
-                              currentQuestion.type === "find_on_model"
-                                ? (answers[currentQuestion.id] || currentQuestion.highlightPart || "")
-                                : (currentQuestion.highlightPart || "")
-                            }
-                            onModelChange={() => {}}
-                            onPartClick={(part) => {
-                              if (currentQuestion.type === "find_on_model") {
-                                handleSelectAnswer(part);
-                              }
-                            }}
-                            language={language}
-                            theme={theme}
-                            studentMode
-                          />
-                        </motion.div>
-                      </AnimatePresence>
-                    </div>
-                  )}
-
-                  <div className={cn(
-                    "border-t",
-                    theme === 'dark' ? "bg-zinc-900 border-zinc-700" : "bg-white border-[#d9dee4]",
-                  )}>
-                    <QuestionArea
-                      question={{
-                        ...currentQuestion,
-                        imageUrl: isPhotoActive ? resolvedImageUrl : undefined,
-                        id: (currentQuestionIdx + 1).toString(),
-                      }}
-                      selectedAnswerId={answers[currentQuestion.id] || null}
-                      onSelectAnswer={handleSelectAnswer}
-                      status={statuses[currentQuestion.id] || "unanswered"}
-                      onNext={() =>
-                        currentQuestionIdx < examQuestions.length - 1 &&
-                        setCurrentQuestionIdx((prev) => prev + 1)
+              <QuestionArea
+                question={{
+                  ...currentQuestion,
+                  imageUrl: isPhotoActive && !is3DActive ? resolvedImageUrl : undefined,
+                  id: (currentQuestionIdx + 1).toString(),
+                }}
+                mediaContent={is3DActive ? (
+                  <Viewer3D
+                    activeModel={currentQuestion.modelId as string}
+                    highlightPart={
+                      currentQuestion.type === "find_on_model"
+                        ? (answers[currentQuestion.id] || currentQuestion.highlightPart || "")
+                        : (currentQuestion.highlightPart || "")
+                    }
+                    onModelChange={() => {}}
+                    onPartClick={(part) => {
+                      if (currentQuestion.type === "find_on_model") {
+                        handleSelectAnswer(part);
                       }
-                      onPrev={() =>
-                        currentQuestionIdx > 0 &&
-                        setCurrentQuestionIdx((prev) => prev - 1)
-                      }
-                      onFinish={handleFinishExam}
-                      hasAnswerSelected={!!statuses[currentQuestion.id]}
-                      canNext={currentQuestionIdx < examQuestions.length - 1}
-                      canPrev={currentQuestionIdx > 0}
-                      isCentered={false}
-                      zoom={1}
-                      theme={theme}
-                      language={language}
-                      className={cn(
-                        "w-full !border-none !h-auto !p-4 shadow-none rounded-none border-0",
-                        theme === 'dark' ? "!bg-zinc-900" : "!bg-white",
-                        "flex-1 min-w-0"
-                      )}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-1 min-h-0 w-full flex-col">
-                  <div
-                    className={cn(
-                      "w-full max-w-[760px] mx-auto relative overflow-hidden transition-all duration-500 rounded-3xl shrink-0",
-                      is3DActive
-                        ? "h-full flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-900"
-                        : "hidden",
-                    )}
-                  >
-                    <AnimatePresence mode="wait">
-                      {isMediaActive ? (
-                        <motion.div
-                          key={currentQuestion.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className={cn(
-                            "absolute inset-0 flex gap-3 p-3",
-                            is3DActive && isPhotoActive ? "flex-col md:flex-row" : "flex-col"
-                          )}
-                        >
-                          {is3DActive && (
-                            <Viewer3D
-                              activeModel={
-                                currentQuestion.modelId as string
-                              }
-                              highlightPart={
-                                currentQuestion.type === "find_on_model"
-                                  ? (answers[currentQuestion.id] || currentQuestion.highlightPart || "")
-                                  : (currentQuestion.highlightPart || "")
-                              }
-                              onModelChange={() => {}}
-                              onPartClick={(part) => {
-                                if (currentQuestion.type === "find_on_model") {
-                                  handleSelectAnswer(part);
-                                }
-                              }}
-                              language={language}
-                              theme={theme}
-                              studentMode
-                            />
-                          )}
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key={`none-${currentQuestion.id}`}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="absolute inset-0 flex items-center justify-center p-12 opacity-50 select-none"
-                        >
-                          <div className="text-center space-y-4">
-                            <div className="w-20 h-20 bg-zinc-500/10 rounded-full flex items-center justify-center mx-auto grayscale">
-                              <GraduationCap size={40} className="text-zinc-500" />
-                            </div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500">
-                              Визуализация отключена
-                            </p>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  <QuestionArea
-                    question={{
-                      ...currentQuestion,
-                      imageUrl: isPhotoActive ? resolvedImageUrl : undefined,
-                      id: (currentQuestionIdx + 1).toString(),
                     }}
-                    selectedAnswerId={answers[currentQuestion.id] || null}
-                    onSelectAnswer={handleSelectAnswer}
-                    status={statuses[currentQuestion.id] || "unanswered"}
-                    onNext={() =>
-                      currentQuestionIdx < examQuestions.length - 1 &&
-                      setCurrentQuestionIdx((prev) => prev + 1)
-                    }
-                    onPrev={() =>
-                      currentQuestionIdx > 0 &&
-                      setCurrentQuestionIdx((prev) => prev - 1)
-                    }
-                    onFinish={handleFinishExam}
-                    hasAnswerSelected={!!statuses[currentQuestion.id]}
-                    canNext={currentQuestionIdx < examQuestions.length - 1}
-                    canPrev={currentQuestionIdx > 0}
-                    isCentered={true}
-                    zoom={1}
-                    theme={theme}
                     language={language}
-                    className={cn(
-                      "transition-all duration-500 w-full flex-1 min-h-0",
-                      "!bg-transparent !border-none !p-0 shadow-none"
-                    )}
+                    theme={theme}
+                    studentMode
                   />
-                </div>
-              )}
+                ) : undefined}
+                selectedAnswerId={answers[currentQuestion.id] || null}
+                onSelectAnswer={handleSelectAnswer}
+                status={statuses[currentQuestion.id] || "unanswered"}
+                onNext={() =>
+                  currentQuestionIdx < examQuestions.length - 1 &&
+                  setCurrentQuestionIdx((prev) => prev + 1)
+                }
+                onPrev={() =>
+                  currentQuestionIdx > 0 &&
+                  setCurrentQuestionIdx((prev) => prev - 1)
+                }
+                onFinish={handleFinishExam}
+                hasAnswerSelected={!!statuses[currentQuestion.id]}
+                canNext={currentQuestionIdx < examQuestions.length - 1}
+                canPrev={currentQuestionIdx > 0}
+                isCentered={true}
+                zoom={1}
+                theme={theme}
+                language={language}
+                className={cn(
+                  "transition-all duration-500 w-full flex-1 min-h-0",
+                  "!bg-transparent !border-none !p-0 shadow-none",
+                )}
+              />
             </div>
           </div>
         </div>
@@ -1313,7 +1204,7 @@ export const StudentMode: React.FC<Props> = ({
                           onClick={handleStartFromConfirm}
                           className="w-full h-16 bg-indigo-600 dark:bg-indigo-700 text-white rounded-[24px] font-black text-xl uppercase tracking-widest shadow-[0_15px_30px_-5px_rgba(79,70,229,0.4)] hover:shadow-[0_20px_40px_-5px_rgba(79,70,229,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-3 group"
                         >
-                          Начать тест
+                            {t.startTest}
                           <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-500" />
                         </button>
                       </div>
@@ -1345,12 +1236,10 @@ export const StudentMode: React.FC<Props> = ({
                           theme === "dark" ? "text-white" : "text-zinc-900",
                         )}
                       >
-                        {language === "ru" ? "Подключение ВУЗа" : "Universitetni ulash"}
+                        {t.universityConnectHeading}
                       </h2>
                       <p className="text-zinc-500 dark:text-zinc-300 text-xs font-bold uppercase tracking-widest mb-8 px-4 leading-relaxed">
-                        {language === "ru" 
-                          ? "Для прохождения тестирования на данном компьютере необходимо подключить его к вашему ВУЗу с помощью уникального ключа" 
-                          : "Ushbu kompyuterda test topshirish uchun uni universitetingizning maxsus kaliti yordamida tizimga ulash lozim"}
+                        {t.universityConnectDescription}
                       </p>
 
                       <div className="relative group w-full max-w-[420px] mx-auto">
@@ -1368,7 +1257,7 @@ export const StudentMode: React.FC<Props> = ({
                           onKeyDown={(e) =>
                             e.key === "Enter" && handleConnectUniversity()
                           }
-                          placeholder={language === "ru" ? "ВВЕДИТЕ КЛЮЧ ВУЗа" : "OTM KALITINI KIRITING"}
+                          placeholder={t.universityKeyPlaceholder}
                           className={cn(
                             "w-full px-6 py-4 text-lg font-bold text-center outline-none transition-all rounded-2xl border-2 uppercase",
                             theme === "dark"
@@ -1396,10 +1285,10 @@ export const StudentMode: React.FC<Props> = ({
                         {isConnecting ? (
                           <>
                             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>{language === "ru" ? "Синхронизация..." : "Sinxronizatsiya..."}</span>
+                            <span>{t.syncing}</span>
                           </>
                         ) : (
-                          <span>{language === "ru" ? "Зарегистрировать компьютер" : "Kompyuterni ro'yxatdan o'tkazish"}</span>
+                          <span>{t.registerComputer}</span>
                         )}
                       </button>
                     </div>
@@ -1430,10 +1319,10 @@ export const StudentMode: React.FC<Props> = ({
                           theme === "dark" ? "text-white" : "text-zinc-900",
                         )}
                       >
-                        Вход в систему
+                        {t.studentLogin}
                       </h2>
                       <p className="text-zinc-500 dark:text-zinc-300 text-xs font-bold uppercase tracking-widest mb-8">
-                        Введите ваш ПИНФЛ для начала теста
+                        {t.enterPinflForTest}
                       </p>
 
                       <div className="relative group w-full max-w-[420px] mx-auto">
@@ -1477,7 +1366,7 @@ export const StudentMode: React.FC<Props> = ({
                       onClick={handlePinflLogin}
                       className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50 shrink-0"
                     >
-                      Приступить к тесту
+                      {t.proceedToTest}
                     </button>
                   </div>
                 </motion.div>
@@ -1529,12 +1418,12 @@ export const StudentMode: React.FC<Props> = ({
                             )}>
                               <div className="relative flex-1">
                                 <Search
-                                  size={18}
-                                  className={cn("absolute left-1 top-1/2 -translate-y-1/2", theme === 'dark' ? "text-zinc-400" : "text-zinc-500")}
+                                  size={12}
+                                  className={cn("absolute left-2.5 top-1/2 -translate-y-1/2", theme === 'dark' ? "text-zinc-500" : "text-zinc-400")}
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Поиск темы..."
+                                  placeholder={t.searchTheme}
                                   value={themeSearch}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1546,21 +1435,20 @@ export const StudentMode: React.FC<Props> = ({
                                       setIsThemeDropdownOpen(true);
                                     }
                                   }}
-                                  className={cn(
-                                    "requested-surface w-full pl-8 pr-10 bg-transparent border-none text-base font-black outline-none",
-                                    theme === 'dark' ? "text-zinc-400 placeholder:text-zinc-400" : "text-zinc-950 placeholder:text-zinc-500"
-                                  )}
+                                  className="w-full pl-8 pr-10 py-1.5 text-xs font-bold outline-none rounded-xl transition-all border bg-bento-bg dark:bg-bento-card border-bento-border text-bento-text-main placeholder:text-bento-text-muted focus:border-indigo-500/50"
                                 />
+                                <button
+                                  type="button"
+                                  onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                                  aria-label={t.selectTheme}
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-400 p-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                >
+                                  <ChevronDown
+                                    size={18}
+                                    className={cn("transition-transform duration-300 stroke-[3]", isThemeDropdownOpen && "rotate-180")}
+                                  />
+                                </button>
                               </div>
-                              <button
-                                onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                                className="text-zinc-500 dark:text-zinc-400 p-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                              >
-                                <ChevronDown
-                                  size={18}
-                                  className={cn("transition-transform duration-300 stroke-[3]", isThemeDropdownOpen && "rotate-180")}
-                                />
-                              </button>
                             </div>
 
                             {/* Dropdown Items (Themes List) - Collapsible with animation */}
@@ -1690,7 +1578,7 @@ export const StudentMode: React.FC<Props> = ({
                                     {filteredThemes.length === 0 && (
                                       <div className="p-8 text-center bg-bento-bg/50 rounded-2xl border border-dashed border-bento-border">
                                         <p className="text-xs text-zinc-400 font-bold italic">
-                                          Темы не найдены
+                                          {t.noThemesFound}
                                         </p>
                                       </div>
                                     )}
@@ -1762,12 +1650,12 @@ export const StudentMode: React.FC<Props> = ({
                             )}>
                               <div className="relative flex-1">
                                 <Search
-                                  size={18}
-                                  className={cn("absolute left-1 top-1/2 -translate-y-1/2", theme === 'dark' ? "text-zinc-400" : "text-zinc-500")}
+                                  size={12}
+                                  className={cn("absolute left-2.5 top-1/2 -translate-y-1/2", theme === 'dark' ? "text-zinc-500" : "text-zinc-400")}
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Поиск группы..."
+                                  placeholder={t.searchGroup}
                                   value={groupSearch}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1779,21 +1667,20 @@ export const StudentMode: React.FC<Props> = ({
                                       setIsGroupDropdownOpen(true);
                                     }
                                   }}
-                                  className={cn(
-                                    "requested-surface w-full pl-8 pr-10 bg-transparent border-none text-base font-black outline-none",
-                                    theme === 'dark' ? "text-zinc-400 placeholder:text-zinc-400" : "text-zinc-950 placeholder:text-zinc-500"
-                                  )}
+                                  className="w-full pl-8 pr-10 py-1.5 text-xs font-bold outline-none rounded-xl transition-all border bg-bento-bg dark:bg-bento-card border-bento-border text-bento-text-main placeholder:text-bento-text-muted focus:border-indigo-500/50"
                                 />
+                                <button
+                                  type="button"
+                                  onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)}
+                                  aria-label={t.selectGroup}
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-400 p-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                >
+                                  <ChevronDown
+                                    size={18}
+                                    className={cn("transition-transform duration-300 stroke-[3]", isGroupDropdownOpen && "rotate-180")}
+                                  />
+                                </button>
                               </div>
-                              <button
-                                onClick={() => setIsGroupDropdownOpen(!isGroupDropdownOpen)}
-                                className="text-zinc-500 dark:text-zinc-400 p-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                              >
-                                <ChevronDown
-                                  size={18}
-                                  className={cn("transition-transform duration-300 stroke-[3]", isGroupDropdownOpen && "rotate-180")}
-                                />
-                              </button>
                             </div>
 
                             {/* Dropdown Items (Groups List) - Collapsible with animation */}
@@ -1924,7 +1811,7 @@ export const StudentMode: React.FC<Props> = ({
                                                     <div className="flex flex-col">
                                                       {false && (
                                                         <span className="text-[8.5px] font-black text-indigo-600 dark:text-indigo-450 uppercase tracking-widest leading-none mb-0.5 animate-pulse">
-                                                          ⚡ {language === 'uz' ? 'Yo‘naltirilgan Tok Impulsi' : 'Импульс Направленного Тока'}
+                                                          ⚡ {t.directedCurrentImpulse}
                                                         </span>
                                                       )}
                                                       <span
@@ -2043,12 +1930,12 @@ export const StudentMode: React.FC<Props> = ({
                             )}>
                               <div className="relative flex-1">
                                 <Search
-                                  size={18}
-                                  className={cn("absolute left-1 top-1/2 -translate-y-1/2", theme === 'dark' ? "text-zinc-400" : "text-zinc-500")}
+                                  size={12}
+                                  className={cn("absolute left-2.5 top-1/2 -translate-y-1/2", theme === 'dark' ? "text-zinc-500" : "text-zinc-400")}
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Поиск себя..."
+                                  placeholder={t.searchStudent}
                                   value={studentSearch}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2060,10 +1947,7 @@ export const StudentMode: React.FC<Props> = ({
                                       setIsStudentDropdownOpen(true);
                                     }
                                   }}
-                                  className={cn(
-                                    "w-full pl-8 pr-10 bg-transparent border-none text-base font-black outline-none",
-                                    theme === 'dark' ? "text-zinc-400 placeholder:text-zinc-400" : "text-zinc-950 placeholder:text-zinc-500"
-                                  )}
+                                  className="w-full pl-8 pr-10 py-1.5 text-xs font-bold outline-none rounded-xl transition-all border bg-zinc-50 dark:bg-bento-card border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 focus:border-indigo-500/50 focus:bg-white dark:focus:bg-bento-card"
                                 />
                               </div>
                               <button

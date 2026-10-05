@@ -14,23 +14,21 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/scr/main.tsx"></script>
-    <script>
+    <script type="module">
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          const isLocalDevelopment = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-          if (isLocalDevelopment) {
-            navigator.serviceWorker.getRegistrations()
-              .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
-              .then(() => caches.keys())
-              .then((cacheNames) => Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName))))
-              .catch((err) => console.warn('Failed to clear local service worker cache:', err));
-            return;
-          }
-
-          navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('ServiceWorker registered:', reg.scope))
-            .catch((err) => console.log('ServiceWorker registration failed:', err));
-        });
+        if (import.meta.env.DEV) {
+          navigator.serviceWorker.getRegistrations()
+            .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+            .then(() => caches.keys())
+            .then((cacheNames) => Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName))))
+            .catch((err) => console.warn('Failed to clear development service worker cache:', err));
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then((reg) => console.log('ServiceWorker registered:', reg.scope))
+              .catch((err) => console.log('ServiceWorker registration failed:', err));
+          });
+        }
       }
     </script>
   </body>

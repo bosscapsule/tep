@@ -38,6 +38,19 @@ export const security = {
   decryptField(value: string): string {
     return electronSecurity()?.decryptField(value) || value;
   },
+  getRememberedUniversityPassword(universityId: string): string {
+    try {
+      const rememberedIds = JSON.parse(localStorage.getItem('saved_university_passwords_v1') || '[]');
+      if (!Array.isArray(rememberedIds) || !rememberedIds.includes(universityId)) return '';
+
+      const passwords = JSON.parse(localStorage.getItem('saved_university_password_values_v1') || '{}');
+      const savedPassword = passwords?.[universityId];
+      return typeof savedPassword === 'string' ? security.decryptField(savedPassword) : '';
+    } catch (error) {
+      console.warn('Could not read the remembered university password:', error);
+      return '';
+    }
+  },
   async verifyAdminLogin(password: string, universities: University[]) {
     const electron = electronSecurity();
     if (electron) return electron.verifyAdmin(password, universities);

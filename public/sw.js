@@ -1,4 +1,4 @@
-const CACHE_NAME = 'anatomy-pro-v2';
+const CACHE_NAME = 'anatomy-pro-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -31,6 +31,22 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseCopy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseCopy));
+        }
+        return networkResponse;
+      }).catch(() => caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) return cachedResponse;
+        return caches.match('/');
+      }))
+    );
+    return;
+  }
   
   // Cache-first for 3D GLB/GLTF models, fonts, icons
   if (

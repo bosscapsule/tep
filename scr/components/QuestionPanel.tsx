@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Question, QuestionStatus, Theme, Language } from '../types';
 import { AnimatePresence, motion } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -22,6 +23,7 @@ interface QuestionPanelProps {
   hasAnswerSelected?: boolean;
   className?: string;
   isCentered?: boolean;
+  mediaContent?: ReactNode;
   zoom?: number;
   theme?: Theme;
   language: Language;
@@ -40,6 +42,7 @@ export default function QuestionPanel({
   hasAnswerSelected,
   className,
   isCentered,
+  mediaContent,
   zoom = 1,
   theme,
   language
@@ -56,7 +59,7 @@ export default function QuestionPanel({
         className
       )}
     >
-      {/* 1. Блок «ТОЛЬКО фото и вопрос»: статичный по высоте, не меняет размеры */}
+      {/* 1. Медиа-блок и вопрос: статичная высота сохраняет положение ответов и кнопок */}
       <div className={cn(
         "w-full transition-colors flex flex-col shrink-0",
         isCentered
@@ -64,19 +67,25 @@ export default function QuestionPanel({
           : "rounded-3xl p-6 md:p-8 border shadow-sm mb-6",
         "bg-bento-card border-bento-border text-bento-text-main"
       )}>
-        {question.imageUrl ? (
+        {mediaContent || question.imageUrl ? (
           <>
             <div className="w-full flex-1 min-h-0 overflow-hidden bg-transparent border-0 flex items-center justify-center p-1 sm:p-2">
-              <img
-                src={question.imageUrl}
-                alt="Question visual"
-                className="h-full w-auto max-w-full object-contain rounded-none sm:rounded-b-xl"
-                referrerPolicy="no-referrer"
-              />
+              {mediaContent ? (
+                <div className="w-full h-full min-h-0 overflow-hidden rounded-2xl">
+                  {mediaContent}
+                </div>
+              ) : (
+                <img
+                  src={question.imageUrl}
+                  alt="Question visual"
+                  className="h-full w-auto max-w-full object-contain rounded-none sm:rounded-b-xl"
+                  referrerPolicy="no-referrer"
+                />
+              )}
             </div>
 
-            {/* Вопрос: фиксированная область внизу блока под фото */}
-            <div className="shrink-0 w-full min-h-[64px] py-3 border-t border-zinc-200/50 dark:border-zinc-800/60 flex items-center">
+            {/* Вопрос занимает фиксированную область под изображением или 3D-моделью */}
+            <div className="shrink-0 w-full min-h-[64px] py-3 flex items-center">
               <h2 className={cn(
                 "font-black leading-relaxed flex flex-wrap items-baseline gap-2.5 m-0 w-full",
                 theme === 'dark' ? "text-white" : "text-zinc-900"
@@ -90,7 +99,7 @@ export default function QuestionPanel({
                   {language === 'ru' ? 'Вопрос' : language === 'uz' ? 'Savol' : 'Question'} {question.id}:
                 </span>
                 <span className={cn(
-                  "text-base sm:text-lg md:text-xl font-black flex-1 min-w-0",
+                  "text-base font-black flex-1 min-w-0",
                   theme === 'dark' ? "text-white" : "text-zinc-900"
                 )}>
                   {question.text}
@@ -99,7 +108,7 @@ export default function QuestionPanel({
             </div>
           </>
         ) : (
-          /* Когда фото в вопросе нет: вопрос заменяет место фото, крупно и по центру */
+          /* Без изображения и 3D-модели вопрос размещается по центру блока */
           <div className="w-full flex-1 min-h-[180px] flex flex-col items-center justify-center text-center px-4 sm:px-10 py-6">
             <span className={cn(
               "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm uppercase tracking-wide font-black shrink-0 border mb-4 shadow-xs",
@@ -110,7 +119,7 @@ export default function QuestionPanel({
               {language === 'ru' ? 'Вопрос' : language === 'uz' ? 'Savol' : 'Question'} {question.id}
             </span>
             <h2 className={cn(
-              "text-lg sm:text-2xl md:text-3xl font-black leading-snug max-w-4xl",
+              "text-base font-black leading-snug max-w-4xl",
               theme === 'dark' ? "text-white" : "text-zinc-900"
             )}>
               {question.text}
@@ -184,7 +193,7 @@ export default function QuestionPanel({
                       {question.type === 'true_false' ? (idx === 0 ? '✓' : '✗') : (question.type === 'multiple' ? (idx + 1) : key)}
                     </div>
                     <span className={cn(
-                      "font-bold text-xs sm:text-sm leading-snug line-clamp-2 break-words",
+                      "font-bold text-base leading-snug line-clamp-2 break-words",
                       theme === 'dark' ? "text-zinc-100" : "text-zinc-800"
                     )}>
                       {text}

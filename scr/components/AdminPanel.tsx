@@ -171,6 +171,38 @@ const ResolvedMediaImage: React.FC<{ value: string; alt: string; className: stri
   return <img src={src} alt={alt} className={className} />;
 };
 
+const formatStudentCount = (count: number, language: Language) => {
+  if (language === 'uz') return `${count} nafar talaba`;
+  if (language === 'en') return `${count} ${count === 1 ? 'student' : 'students'}`;
+
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+  const noun = lastTwoDigits >= 11 && lastTwoDigits <= 14
+    ? 'студентов'
+    : lastDigit === 1
+      ? 'студент'
+      : lastDigit >= 2 && lastDigit <= 4
+        ? 'студента'
+        : 'студентов';
+  return `${count} ${noun}`;
+};
+
+const formatQuestionCount = (count: number, language: Language) => {
+  if (language === 'uz') return `${count} ta savol`;
+  if (language === 'en') return `${count} ${count === 1 ? 'question' : 'questions'}`;
+
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+  const noun = lastTwoDigits >= 11 && lastTwoDigits <= 14
+    ? 'вопросов'
+    : lastDigit === 1
+      ? 'вопрос'
+      : lastDigit >= 2 && lastDigit <= 4
+        ? 'вопроса'
+        : 'вопросов';
+  return `${count} ${noun}`;
+};
+
 export const AdminPanel: React.FC<Props> = ({ 
   onLogout, 
   language, 
@@ -181,7 +213,9 @@ export const AdminPanel: React.FC<Props> = ({
   activeUniversity = null,
   onUniversityUpdate
 }) => {
-  const t = useTranslation(language); const isDarkTheme = theme === 'dark';
+  const t = useTranslation(language);
+  const isDarkTheme = theme === 'dark';
+  const locale = language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-US';
   const groupListRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const modelInputRef = useRef<HTMLInputElement>(null);
@@ -258,13 +292,13 @@ export const AdminPanel: React.FC<Props> = ({
     e.preventDefault();
     if (!newUniName.trim()) return;
     if (!expiryDate) {
-      alert(language === 'ru' ? 'Пожалуйста, выберите дату окончания действия ключа!' : 'Iltimos, kalit amal qilish muddatini tanlang!');
+      alert(t.chooseKeyExpirationDate);
       return;
     }
     const finalKey = newUniKey.trim().toUpperCase() || generateRandomKey();
     
     if (universities.some(u => u.key === finalKey)) {
-      alert(language === 'ru' ? 'Этот ключ уже используется!' : 'Bu kalit allaqachon band!');
+      alert(t.keyAlreadyInUse);
       return;
     }
 
@@ -275,7 +309,7 @@ export const AdminPanel: React.FC<Props> = ({
       id: 'uni_' + Date.now(),
       name: newUniName.trim(),
       key: finalKey,
-      createdAt: new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ'),
+      createdAt: new Date().toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-US'),
       expiresAt,
       logoUrl: newUniLogoUrl.trim() || undefined,
       bgUrl: newUniBgUrl.trim() || undefined,
@@ -376,7 +410,7 @@ export const AdminPanel: React.FC<Props> = ({
                 ...cu,
                 ...merged[idx],
                 name: cu.name || merged[idx].name,
-                expiresAt: cu.expiresAt || merged[idx].expiresAt,
+                expiresAt: merged[idx].expiresAt || cu.expiresAt,
               };
             } else {
               merged.push(cu);
@@ -417,9 +451,7 @@ export const AdminPanel: React.FC<Props> = ({
       syncService.publishUniversities(updated);
     } catch (error) {
       console.error('Failed to save university branding', error);
-      alert(language === 'ru'
-        ? 'Не удалось сохранить логотип или фон. Возможно, превышен лимит локального хранилища.'
-        : 'Logo or background could not be saved. Local storage quota may be exceeded.');
+      alert(t.failedSaveBranding);
     }
   };
 
@@ -437,7 +469,7 @@ export const AdminPanel: React.FC<Props> = ({
 
   const handleResultsLogoUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert(language === 'ru' ? 'Выберите файл изображения для логотипа.' : 'Please choose an image file for the logo.');
+      alert(t.chooseLogoImage);
       return;
     }
 
@@ -466,9 +498,7 @@ export const AdminPanel: React.FC<Props> = ({
   const handleBrandLogoUpload = async (file: File) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      alert(language === 'ru'
-        ? 'Пожалуйста, выберите файл изображения для логотипа.'
-        : 'Please choose an image file for the logo.');
+      alert(t.chooseLogoImage);
       return;
     }
 
@@ -481,18 +511,14 @@ export const AdminPanel: React.FC<Props> = ({
 
       const compressed = await compressImage(file, 300, 0.75);
       if (!compressed) {
-        alert(language === 'ru'
-          ? 'Не удалось обработать логотип. Попробуйте другой файл.'
-          : 'Could not process the logo. Please try another file.');
+        alert(t.failedProcessLogo);
         return;
       }
 
       setBrandLogo(compressed);
     } catch (error) {
       console.error('Logo upload failed', error);
-      alert(language === 'ru'
-        ? 'Ошибка загрузки логотипа. Попробуйте снова.'
-        : 'Logo upload failed. Please try again.');
+      alert(t.failedUploadLogo);
     }
   };
 
@@ -508,17 +534,13 @@ export const AdminPanel: React.FC<Props> = ({
       }
 
       if (!file.type.startsWith('image/')) {
-        alert(language === 'ru'
-          ? 'Пожалуйста, выберите фото или видео.'
-          : 'Please choose an image or video file.');
+        alert(t.chooseImageOrVideo);
         return;
       }
 
       const compressed = await compressImage(file, 800, 0.65);
       if (!compressed) {
-        alert(language === 'ru'
-          ? 'Не удалось обработать фон. Попробуйте другой файл.'
-          : 'Could not process the background. Please try another file.');
+        alert(t.failedProcessBackground);
         return;
       }
 
@@ -526,9 +548,7 @@ export const AdminPanel: React.FC<Props> = ({
       setBrandBgType('image');
     } catch (error) {
       console.error('Background upload failed', error);
-      alert(language === 'ru'
-        ? 'Ошибка загрузки фона. Попробуйте снова.'
-        : 'Background upload failed. Please try again.');
+      alert(t.failedUploadBackground);
     }
   };
 
@@ -593,6 +613,8 @@ export const AdminPanel: React.FC<Props> = ({
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>(() => audit.sessions());
   const [auditActionFilter, setAuditActionFilter] = useState<'all' | AuditEntry['action']>('all');
   const [auditUniversityFilter, setAuditUniversityFilter] = useState('all');
+  const [activeDeviceSearch, setActiveDeviceSearch] = useState('');
+  const [auditEntrySearch, setAuditEntrySearch] = useState('');
   const superAdminDatePickerRef = useRef<HTMLDivElement>(null);
   const expiryExtensionPickerRef = useRef<HTMLDivElement>(null);
 
@@ -617,11 +639,8 @@ export const AdminPanel: React.FC<Props> = ({
     URL.revokeObjectURL(url);
   };
 
-  const filteredAuditEntries = auditEntries.filter((entry) => {
-    const actionMatches = auditActionFilter === 'all' || entry.action === auditActionFilter;
-    const universityMatches = auditUniversityFilter === 'all' || entry.universityId === auditUniversityFilter;
-    return actionMatches && universityMatches;
-  });
+  const auditUniversityName = (universityId?: string) =>
+    universities.find((university) => university.id === universityId)?.name || '—';
 
   const auditActionLabel = (action: AuditEntry['action']) => {
     const labels: Record<AuditEntry['action'], string> = {
@@ -634,6 +653,32 @@ export const AdminPanel: React.FC<Props> = ({
     return labels[action];
   };
 
+  const filteredAuditEntries = auditEntries.filter((entry) => {
+    const actionMatches = auditActionFilter === 'all' || entry.action === auditActionFilter;
+    const universityMatches = auditUniversityFilter === 'all' || entry.universityId === auditUniversityFilter;
+    const search = auditEntrySearch.trim().toLocaleLowerCase();
+    const searchMatches = !search || [
+      auditActionLabel(entry.action),
+      entry.actor,
+      auditUniversityName(entry.universityId),
+      entry.details || '',
+      new Date(entry.timestamp).toLocaleString(),
+    ].some((value) => value.toLocaleLowerCase().includes(search));
+    return actionMatches && universityMatches && searchMatches;
+  });
+
+  const filteredActiveDeviceSessions = deviceSessions.filter((session) => {
+    if (session.revoked) return false;
+    const search = activeDeviceSearch.trim().toLocaleLowerCase();
+    return !search || [
+      session.actor,
+      session.deviceName,
+      session.ipAddress,
+      auditUniversityName(session.universityId),
+      new Date(session.lastSeenAt).toLocaleString(),
+    ].some((value) => value.toLocaleLowerCase().includes(search));
+  });
+
   const openUniversityExpiryPicker = (university: University) => {
     const monthDate = university.expiresAt ? new Date(university.expiresAt) : new Date();
     setExpiryExtensionTargetId(university.id);
@@ -642,17 +687,24 @@ export const AdminPanel: React.FC<Props> = ({
     setIsExpiryExtensionPickerOpen(true);
   };
 
-  const applyUniversityExpiryDate = (university: University, dateStr: string) => {
+  const applyUniversityExpiryDate = async (university: University, dateStr: string) => {
     const parsedDate = new Date(dateStr + 'T23:59:59');
     if (Number.isNaN(parsedDate.getTime())) return;
 
     const updated = storage.extendUniversityExpiry(university.id, parsedDate.toISOString());
     if (!updated) {
-      alert(language === 'ru' ? 'Не удалось обновить срок доступа.' : 'Kirish muddati yangilanmadi.');
+      alert(t.expiryUpdateFailed);
       return;
     }
 
-    setUniversities(storage.getUniversities());
+    const updatedUniversities = storage.getUniversities();
+    setUniversities(updatedUniversities);
+    try {
+      await syncService.publishUniversities(updatedUniversities);
+    } catch (error) {
+      console.error('Failed to sync university expiry date:', error);
+      alert(t.expirySyncFailed);
+    }
     setIsExpiryExtensionPickerOpen(false);
     setExpiryExtensionTargetId(null);
     audit.record('university_key_rotated', 'superadmin', university.id, `expiry extended to ${dateStr}`);
@@ -663,7 +715,8 @@ export const AdminPanel: React.FC<Props> = ({
     try {
       const saved = localStorage.getItem('saved_university_passwords_v1');
       return saved ? JSON.parse(saved) : [];
-    } catch {
+    } catch (error) {
+      console.error('Failed to load remembered university passwords:', error);
       return [];
     }
   });
@@ -686,7 +739,9 @@ export const AdminPanel: React.FC<Props> = ({
       }
       localStorage.setItem('saved_university_password_values_v1', JSON.stringify(savedPasswords));
       localStorage.setItem('saved_university_passwords_v1', JSON.stringify(nextIds));
-    } catch {
+    } catch (error) {
+      console.error('Failed to save remembered university password:', error);
+      alert(t.rememberPasswordFailed);
       return;
     }
     setRememberedUniversityIds(nextIds);
@@ -698,7 +753,9 @@ export const AdminPanel: React.FC<Props> = ({
       const savedPasswords = JSON.parse(localStorage.getItem('saved_university_password_values_v1') || '{}') as Record<string, string>;
       savedPasswords[activeUniversity.id] = security.encryptField(activeUniversity.key);
       localStorage.setItem('saved_university_password_values_v1', JSON.stringify(savedPasswords));
-    } catch {
+    } catch (error) {
+      console.error('Failed to remember active university password:', error);
+      alert(t.rememberPasswordFailed);
       return;
     }
   };
@@ -731,18 +788,20 @@ export const AdminPanel: React.FC<Props> = ({
   const [customModelUrl, setCustomModelUrl] = useState('');
   const [customModelLabelIcon, setCustomModelLabelIcon] = useState('📦');
 
-  const [modelLabels, setModelLabels] = useState<Record<string, Record<string, {nameRu: string, nameUz: string, color: string, description?: string, showArrow?: boolean}>>>(() => {
-    const DEFAULT_MODEL_LABELS: Record<string, Record<string, {nameRu: string, nameUz: string, color: string, description?: string, showArrow?: boolean}>> = {
+  const [modelLabels, setModelLabels] = useState<Record<string, Record<string, {nameRu: string, nameUz: string, nameEn?: string, color: string, description?: string, showArrow?: boolean}>>>(() => {
+    const DEFAULT_MODEL_LABELS: Record<string, Record<string, {nameRu: string, nameUz: string, nameEn?: string, color: string, description?: string, showArrow?: boolean}>> = {
       skull: {
         cranium: { 
           nameRu: 'Теменная и лобная кость (Cranium)', 
           nameUz: 'Tepalik va peshona suyagi (Cranium)', 
+          nameEn: 'Cranial vault and frontal bones (Cranium)',
           color: '#10b981',
           description: 'Верхняя часть человеческого черепа, защищающая головной мозг.'
         },
         mandible: { 
           nameRu: 'Нижняя челюсть (Mandibula)', 
           nameUz: 'Pastki jag\' (Mandibula)', 
+          nameEn: 'Mandible',
           color: '#3b82f6',
           description: 'Единственная кость черепа, способная совершать активные движения.'
         }
@@ -751,6 +810,7 @@ export const AdminPanel: React.FC<Props> = ({
         mandible: { 
           nameRu: 'Нижняя челюсть со стоп-зубами (Mandibula)', 
           nameUz: 'Tishli pastki jag\' (Mandibula)', 
+          nameEn: 'Mandible with teeth',
           color: '#f59e0b',
           description: 'Нижняя челюстная кость человека с зубными рядами.'
         }
@@ -759,18 +819,21 @@ export const AdminPanel: React.FC<Props> = ({
         left: { 
           nameRu: 'Левое полушарие (Hemispherium sinistrum)', 
           nameUz: 'Chap yarim shar (Hemispherium sinistrum)', 
+          nameEn: 'Left cerebral hemisphere',
           color: '#a855f7',
           description: 'Отвечает за логическое и критическое мышление, математические вычисления.'
         },
         right: { 
           nameRu: 'Правое полушарие (Hemispherium dextrum)', 
           nameUz: 'O\'ng yarim shar (Hemispherium dextrum)', 
+          nameEn: 'Right cerebral hemisphere',
           color: '#ec4899',
           description: 'Отвечает за обработку невербальной информации, пространственную ориентацию.'
         },
         cerebellum: { 
           nameRu: 'Мозжечок (Cerebellum)', 
           nameUz: 'Miyacha (Cerebellum)', 
+          nameEn: 'Cerebellum',
           color: '#10b981',
           description: 'Отдел головного мозга, играющий решающую роль в координации движений.'
         }
@@ -867,10 +930,10 @@ export const AdminPanel: React.FC<Props> = ({
   };
 
   const CLINICAL_PALETTES = [
-    { nameRu: 'Классик', nameUz: 'Klassik', colors: ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899'] },
-    { nameRu: 'Неон', nameUz: 'Neon', colors: ['#ff0055', '#00ffcc', '#ffcc00', '#9900ff', '#ff6600'] },
-    { nameRu: 'Свежий', nameUz: 'Yorqin', colors: ['#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1'] },
-    { nameRu: 'Теплый', nameUz: 'Issiq', colors: ['#b91c1c', '#dc2626', '#ef4444', '#f87171', '#fca5a5'] }
+    { nameRu: 'Классик', nameUz: 'Klassik', nameEn: 'Classic', colors: ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899'] },
+    { nameRu: 'Неон', nameUz: 'Neon', nameEn: 'Neon', colors: ['#ff0055', '#00ffcc', '#ffcc00', '#9900ff', '#ff6600'] },
+    { nameRu: 'Свежий', nameUz: 'Yorqin', nameEn: 'Fresh', colors: ['#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1'] },
+    { nameRu: 'Теплый', nameUz: 'Issiq', nameEn: 'Warm', colors: ['#b91c1c', '#dc2626', '#ef4444', '#f87171', '#fca5a5'] }
   ];
 
   const applyCuratedPalette = (colors: string[]) => {
@@ -935,13 +998,13 @@ export const AdminPanel: React.FC<Props> = ({
       setSimulatorScore(prev => ({ correct: prev.correct + 1, total: prev.total + 1 }));
       
       const currentLabel = modelLabels[getModelStorageKey(selectedModelId3D, mediaLibrary)]?.[simulatorTargetPart];
-      const partName = currentLabel ? (language === 'ru' ? currentLabel.nameRu : currentLabel.nameUz) : simulatorTargetPart;
+      const partName = currentLabel
+        ? language === 'en' ? currentLabel.nameEn || currentLabel.nameUz : language === 'ru' ? currentLabel.nameRu : currentLabel.nameUz
+        : simulatorTargetPart;
       
       setSimulatorFeedback({
         type: 'success',
-        message: language === 'ru' 
-          ? `Правильно! Линейный сегмент опознан: "${partName}" 🎉` 
-          : `To‘g‘ri! Anatomik soha aniqlandi: "${partName}" 🎉`
+        message: t.correctModelAnswer.replace('{part}', partName)
       });
 
       // Automatically load the next part after 1800ms
@@ -962,9 +1025,7 @@ export const AdminPanel: React.FC<Props> = ({
       
       setSimulatorFeedback({
         type: 'error',
-        message: language === 'ru' 
-          ? `Неверно! Вы указали на "${clickedName}". Попробуйте еще раз!` 
-          : `Noto‘g‘ri! Siz "${clickedName}" qismini belgiladingiz. Davom eting!`
+        message: t.incorrectModelAnswer.replace('{part}', clickedName)
       });
     }
   };
@@ -1191,7 +1252,7 @@ export const AdminPanel: React.FC<Props> = ({
 
   const handleRestoreBackupData = (data: any) => {
     if (!data || !data.questions || !data.students || !data.groups) {
-      alert(language === 'ru' ? "Неверный формат файла резервной копии!" : "Zaxira nusxa fayli formati noto'g'ri!");
+      alert(t.invalidBackupFormat);
       return false;
     }
     
@@ -1212,7 +1273,7 @@ export const AdminPanel: React.FC<Props> = ({
     setSettings(storage.getSettings());
     setTimerMinutes(storage.getSettings().timerMinutes);
     
-    alert(language === 'ru' ? "Резервная копия успешно восстановлена!" : "Zaxira nusxasi muvaffaqiyatli tiklandi!");
+    alert(t.backupRestored);
     return true;
   };
 
@@ -1226,7 +1287,7 @@ export const AdminPanel: React.FC<Props> = ({
         const parsed = JSON.parse(evt.target?.result as string);
         handleRestoreBackupData(parsed);
       } catch (err) {
-        alert(language === 'ru' ? "Ошибка чтения файла!" : "Faylni o'qishda xatolik!");
+        alert(t.backupReadFailed);
       }
     };
     reader.readAsText(file);
@@ -1369,7 +1430,7 @@ export const AdminPanel: React.FC<Props> = ({
 
   const handleBulkDelete = () => {
     if (selectedStudentIds.size === 0) return;
-    if (!confirm(`Удалить ${selectedStudentIds.size} студентов?`)) return;
+    if (!confirm(t.confirmDeleteStudents.replace('{count}', String(selectedStudentIds.size)))) return;
     
     const updated = students.filter(s => !selectedStudentIds.has(s.id));
     setStudents(updated);
@@ -1685,7 +1746,7 @@ export const AdminPanel: React.FC<Props> = ({
             const questionText = lines[0];
             const options: Question['options'] = { A: '', B: '', C: '', D: '', E: '', F: '', G: '', H: '' };
             let correctAnswer: any = 'A';
-            let theme = 'Импортированные';
+            let theme = t.imported;
             let type: 'single' | 'multiple' | 'true_false' = 'single';
             let lang: Language = 'ru';
 
@@ -1724,7 +1785,7 @@ export const AdminPanel: React.FC<Props> = ({
             storage.saveQuestions(updated);
             alert(`Успешно импортировано ${importedQuestions.length} вопросов`);
           } else {
-            alert("Не удалось найти вопросы в файле. Пожалуйста, используйте формат: \n\nТекст вопроса\nA) Вариант 1\nB) Вариант 2\nCorrect: A\nTheme: Тема");
+            alert(t.questionImportNoQuestions);
           }
         } catch (e) {
           alert("Ошибка при разборе DOCX файла");
@@ -1998,9 +2059,9 @@ export const AdminPanel: React.FC<Props> = ({
                 type="button"
                 onClick={rememberActiveUniversity}
                 className="px-3 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 font-black text-[10px] uppercase tracking-wider transition-all hover:bg-emerald-500/20 cursor-pointer"
-                title={language === 'ru' ? 'Запомнить пароль этого ВУЗа' : 'OTM parolini eslab qolish'}
+                title={t.rememberUniversityPassword}
               >
-                {language === 'ru' ? 'Запомнить' : language === 'uz' ? 'Eslab qolish' : 'Remember'}
+                {t.rememberMe}
               </button>
             )}
           </div>
@@ -2093,7 +2154,7 @@ export const AdminPanel: React.FC<Props> = ({
 
                       <div className="md:col-span-3 space-y-1.5 relative" ref={superAdminDatePickerRef}>
                         <label className="text-[10px] font-black text-bento-text-muted uppercase tracking-wider block">
-                          {language === 'ru' ? 'Срок действия ключа (Выберите дату)' : 'Kalitning amal qilish muddati (Sanani tanlang)'}
+                          {t.keyExpiryDateLabel}
                         </label>
                         <div className="relative group/date">
                           <button 
@@ -2101,7 +2162,7 @@ export const AdminPanel: React.FC<Props> = ({
                             onClick={() => setIsSuperAdminDatePickerOpen(!isSuperAdminDatePickerOpen)}
                             className="w-full bg-picker-bg hover:bg-picker-hover border-2 border-picker-border rounded-xl px-4 py-3 text-xs font-black text-picker-text transition-all pr-10 flex items-center text-left cursor-pointer outline-none focus:border-indigo-500 shadow-sm"
                           >
-                            {expiryDate ? new Date(expiryDate).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : (language === 'ru' ? 'Выберите дату' : 'Sanani tanlang')}
+                            {expiryDate ? new Date(expiryDate).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }) : t.chooseDate}
                           </button>
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500 transition-colors">
                             <Calendar size={14} />
@@ -2140,7 +2201,7 @@ export const AdminPanel: React.FC<Props> = ({
                                           : "text-[#1e293b] dark:text-[#f8fafc] hover:bg-zinc-100 dark:hover:bg-zinc-800"
                                       )}
                                     >
-                                      {currentSuperAdminCalendarDate.toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { month: 'long' })}
+                                      {currentSuperAdminCalendarDate.toLocaleDateString(locale, { month: 'long' })}
                                     </button>
                                     <span className="text-zinc-300 dark:text-zinc-700 text-xs font-bold">/</span>
                                     <button
@@ -2240,7 +2301,7 @@ export const AdminPanel: React.FC<Props> = ({
                                 {superAdminCalendarView === 'months' && (
                                   <div className="grid grid-cols-3 gap-2 py-1">
                                     {Array.from({ length: 12 }).map((_, i) => {
-                                      const monthName = new Date(2000, i, 1).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { month: 'short' });
+                                      const monthName = new Date(2000, i, 1).toLocaleDateString(locale, { month: 'short' });
                                       const isSelected = currentSuperAdminCalendarDate.getMonth() === i;
                                       return (
                                         <button
@@ -2427,7 +2488,7 @@ export const AdminPanel: React.FC<Props> = ({
                                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border-emerald-500/20 shadow-[0_0_0_1px_rgba(16,185,129,0.08)]"
                                         : "bg-bento-bg hover:bg-zinc-200 dark:hover:bg-zinc-800 text-bento-text-main border-bento-border"
                                     )}
-                                    title={language === 'ru' ? 'Сохранить пароль этого ВУЗа' : 'OTM parolini saqlash'}
+                                    title={t.rememberUniversityPassword}
                                   >
                                     <AnimatePresence mode="wait">
                                       <motion.span
@@ -2438,24 +2499,9 @@ export const AdminPanel: React.FC<Props> = ({
                                         transition={{ duration: 0.18, ease: 'easeInOut' }}
                                         className="inline-flex items-center justify-center"
                                       >
-                                        {language === 'ru'
-                                          ? (rememberedUniversityIds.includes(uni.id) ? 'Сохранено' : 'Сохранить')
-                                          : language === 'uz'
-                                            ? (rememberedUniversityIds.includes(uni.id) ? 'Saqlandi' : 'Saqlash')
-                                            : (rememberedUniversityIds.includes(uni.id) ? 'Saved' : 'Save')}
+                                        {rememberedUniversityIds.includes(uni.id) ? t.saved : t.save}
                                       </motion.span>
                                     </AnimatePresence>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(uni.key);
-                                      alert(language === 'ru' ? 'Ключ скопирован в буфер обмена!' : 'Kalit nusxalandi!');
-                                    }}
-                                    className="px-3 py-2 bg-bento-bg hover:bg-zinc-200 dark:hover:bg-zinc-800 text-bento-text-main font-bold text-[10px] rounded-lg transition-all uppercase tracking-wider border border-bento-border cursor-pointer"
-                                  >
-                                    {language === 'ru' ? 'Копировать' : 'Nusxa'}
                                   </button>
 
                                   <div ref={expiryExtensionPickerRef} className="relative inline-block">
@@ -2487,7 +2533,7 @@ export const AdminPanel: React.FC<Props> = ({
                                                 expiryExtensionCalendarView === 'months' ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-[#4f46e5]' : 'text-[#1e293b] dark:text-[#f8fafc] hover:bg-zinc-100 dark:hover:bg-zinc-800'
                                               )}
                                             >
-                                              {currentExpiryExtensionCalendarDate.toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { month: 'long' })}
+                                              {currentExpiryExtensionCalendarDate.toLocaleDateString(locale, { month: 'long' })}
                                             </button>
                                             <span className="text-zinc-300 dark:text-zinc-700 text-xs font-bold">/</span>
                                             <button
@@ -2565,7 +2611,7 @@ export const AdminPanel: React.FC<Props> = ({
                                         {expiryExtensionCalendarView === 'months' && (
                                           <div className="grid grid-cols-3 gap-2 py-1">
                                             {Array.from({ length: 12 }).map((_, i) => {
-                                              const monthName = new Date(2000, i, 1).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { month: 'short' });
+                                              const monthName = new Date(2000, i, 1).toLocaleDateString(locale, { month: 'short' });
                                               const isSelected = currentExpiryExtensionCalendarDate.getMonth() === i;
                                               return (
                                                 <button
@@ -2617,26 +2663,6 @@ export const AdminPanel: React.FC<Props> = ({
 
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      if (isExpired) {
-                                        alert(language === 'ru' ? 'Срок действия этого ключа истек! Вход невозможен.' : 'Ushbu kalitning amal qilish muddati tugagan! Kirish taqiqlangan.');
-                                        return;
-                                      }
-                                      storage.setCurrentUniversity(uni);
-                                      window.location.reload();
-                                    }}
-                                    className={cn(
-                                      "px-3 py-2 font-bold text-[10px] rounded-lg transition-all uppercase tracking-wider cursor-pointer",
-                                      isExpired 
-                                        ? "bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 cursor-not-allowed" 
-                                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                                    )}
-                                  >
-                                    {language === 'ru' ? 'Войти' : 'Kirish'}
-                                  </button>
-
-                                  <button
-                                    type="button"
                                     onClick={() => handleDeleteUniversity(uni)}
                                     className="p-2 text-zinc-400 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-500/20 hover:bg-red-500/5 cursor-pointer"
                                     title={language === 'ru' ? 'Удалить ВУЗ' : 'Oʻchirish'}
@@ -2679,11 +2705,22 @@ export const AdminPanel: React.FC<Props> = ({
                 </div>
 
                 <section className="space-y-3">
-                  <h3 className="text-sm font-black uppercase tracking-tight">
-                    {language === 'ru' ? 'Активные устройства' : 'Faol qurilmalar'}
-                  </h3>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <h3 className="text-sm font-black uppercase tracking-tight">{t.activeDevices}</h3>
+                    <div className="relative w-full md:w-72">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-bento-text-muted" />
+                      <input
+                        type="search"
+                        value={activeDeviceSearch}
+                        onChange={(event) => setActiveDeviceSearch(event.target.value)}
+                        placeholder={t.searchActiveDevices}
+                        aria-label={t.searchActiveDevices}
+                        className="w-full rounded-lg border border-bento-border bg-bento-bg py-2 pl-9 pr-3 text-xs font-bold text-bento-text-main placeholder:text-bento-text-muted outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
                   <div className="space-y-2">
-                    {deviceSessions.filter((session) => !session.revoked).map((session) => (
+                    {filteredActiveDeviceSessions.map((session) => (
                       <div key={session.id} className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-2xl border border-bento-border bg-bento-bg/30 p-4">
                         <div className="min-w-0">
                           <p className="text-xs font-black truncate">{session.actor} · {session.deviceName}</p>
@@ -2701,44 +2738,64 @@ export const AdminPanel: React.FC<Props> = ({
                         </button>
                       </div>
                     ))}
-                    {deviceSessions.every((session) => session.revoked) && (
+                    {filteredActiveDeviceSessions.length === 0 && (
                       <p className="rounded-2xl border border-dashed border-bento-border p-6 text-center text-xs text-bento-text-muted">
-                        {language === 'ru' ? 'Активных устройств нет.' : 'Faol qurilmalar yo‘q.'}
+                        {deviceSessions.some((session) => !session.revoked) ? t.noMatchingDevices : t.noActiveDevices}
                       </p>
                     )}
                   </div>
                 </section>
 
                 <section className="space-y-3">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <h3 className="text-sm font-black uppercase tracking-tight">
-                      {language === 'ru' ? 'Последние действия' : 'So‘nggi harakatlar'}
-                    </h3>
-                    <select
-                      value={auditActionFilter}
-                      onChange={(event) => setAuditActionFilter(event.target.value as typeof auditActionFilter)}
-                      className="px-3 py-2 rounded-lg border border-bento-border bg-bento-bg text-xs font-bold"
-                    >
-                      <option value="all">{language === 'ru' ? 'Все действия' : 'Barcha harakatlar'}</option>
-                      <option value="login">{auditActionLabel('login')}</option>
-                      <option value="question_updated">{auditActionLabel('question_updated')}</option>
-                      <option value="students_imported">{auditActionLabel('students_imported')}</option>
-                      <option value="university_key_rotated">{auditActionLabel('university_key_rotated')}</option>
-                      <option value="session_revoked">{auditActionLabel('session_revoked')}</option>
-                    </select>
+                  <div className="flex flex-col gap-3">
+                    <h3 className="text-sm font-black uppercase tracking-tight">{t.recentActions}</h3>
+                    <div className="flex flex-col md:flex-row gap-2">
+                      <div className="relative flex-1">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-bento-text-muted" />
+                        <input
+                          type="search"
+                          value={auditEntrySearch}
+                          onChange={(event) => setAuditEntrySearch(event.target.value)}
+                          placeholder={t.searchActions}
+                          aria-label={t.searchActions}
+                          className="w-full rounded-lg border border-bento-border bg-bento-bg py-2 pl-9 pr-3 text-xs font-bold text-bento-text-main placeholder:text-bento-text-muted outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <select
+                        value={auditActionFilter}
+                        onChange={(event) => setAuditActionFilter(event.target.value as typeof auditActionFilter)}
+                        className="px-3 py-2 rounded-lg border border-bento-border bg-bento-bg text-xs font-bold"
+                      >
+                        <option value="all">{t.allActions}</option>
+                        <option value="login">{auditActionLabel('login')}</option>
+                        <option value="question_updated">{auditActionLabel('question_updated')}</option>
+                        <option value="students_imported">{auditActionLabel('students_imported')}</option>
+                        <option value="university_key_rotated">{auditActionLabel('university_key_rotated')}</option>
+                        <option value="session_revoked">{auditActionLabel('session_revoked')}</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="overflow-auto rounded-2xl border border-bento-border">
                     <table className="w-full text-left text-xs">
-                      <tbody>
+                    <thead>
+                      <tr className="border-b border-bento-border text-[10px] uppercase tracking-wider text-bento-text-muted">
+                        <th className="p-3">{t.auditAction}</th>
+                        <th className="p-3">{t.auditActor}</th>
+                        <th className="p-3">{t.university}</th>
+                        <th className="p-3">{t.date}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
                         {filteredAuditEntries.slice(0, 100).map((entry) => (
                           <tr key={entry.id} className="border-b border-bento-border last:border-0">
                             <td className="p-3 font-bold">{auditActionLabel(entry.action)}</td>
                             <td className="p-3 text-bento-text-muted">{entry.actor}</td>
+                            <td className="p-3 text-bento-text-muted">{auditUniversityName(entry.universityId)}</td>
                             <td className="p-3 text-bento-text-muted whitespace-nowrap">{new Date(entry.timestamp).toLocaleString()}</td>
                           </tr>
                         ))}
                         {filteredAuditEntries.length === 0 && (
-                          <tr><td colSpan={3} className="p-6 text-center text-bento-text-muted">{language === 'ru' ? 'Записей нет.' : 'Yozuvlar mavjud emas.'}</td></tr>
+                          <tr><td colSpan={4} className="p-6 text-center text-bento-text-muted">{auditEntries.length ? t.noMatchingActions : t.noAuditEntries}</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -2778,7 +2835,7 @@ export const AdminPanel: React.FC<Props> = ({
                         {/* Select University */}
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-bento-text-muted uppercase tracking-wider block">
-                            {language === 'ru' ? 'Выберите ВУЗ для редактирования' : 'Tahrirlash uchun OTMni tanlang'}
+                            {t.chooseUniversityToEdit}
                           </label>
                           <select
                             value={selectedBrandingUniId}
@@ -2793,13 +2850,13 @@ export const AdminPanel: React.FC<Props> = ({
 
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-bento-text-muted uppercase tracking-wider block">
-                            {language === 'ru' ? 'Название ВУЗа для отчётов' : 'Hisobot uchun OTM nomi'}
+                            {t.reportUniversityName}
                           </label>
                           <input
                             type="text"
                             value={brandName}
                             onChange={(e) => setBrandName(e.target.value)}
-                            placeholder={language === 'ru' ? 'Введите название ВУЗа' : 'OTM nomini kiriting'}
+                            placeholder={t.enterUniversityName}
                             className="w-full px-4 py-3 bg-bento-bg border border-bento-border rounded-xl font-medium text-xs text-bento-text-main focus:border-indigo-500 outline-none"
                           />
                         </div>
@@ -2807,7 +2864,7 @@ export const AdminPanel: React.FC<Props> = ({
                         {/* Logo Upload Zone */}
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-black text-bento-text-muted uppercase tracking-wider block">
-                            {language === 'ru' ? 'Логотип ВУЗа (Изображение)' : 'OTM logotipi (Tasvir)'}
+                            {t.universityLogoImage}
                           </label>
                           
                           {brandLogo ? (
@@ -2815,7 +2872,7 @@ export const AdminPanel: React.FC<Props> = ({
                               <img src={brandLogo} className="w-12 h-12 object-contain bg-white dark:bg-zinc-800 p-1 rounded-lg border border-bento-border" alt="Uploaded Logo" />
                               <div className="flex-1 overflow-hidden">
                                 <p className="text-[10px] font-bold text-bento-text-main truncate">
-                                  {language === 'ru' ? 'Загруженный логотип' : 'Yuklangan logotip'}
+                                  {t.uploadedLogo}
                                 </p>
                                 <p className="text-[8px] text-bento-text-muted">Base64 Data URL</p>
                               </div>
@@ -3118,7 +3175,7 @@ export const AdminPanel: React.FC<Props> = ({
                           onClick={handleBulkDelete}
                           className="flex items-center gap-2 px-3 py-1.5 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors text-[10px] font-black uppercase tracking-widest"
                         >
-                          <Trash2 size={14} /> Удалить
+                          <Trash2 size={14} /> {t.delete}
                         </button>
 
                         <button 
@@ -3134,14 +3191,14 @@ export const AdminPanel: React.FC<Props> = ({
 
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                   <div>
-                    <h2 className="text-lg font-black tracking-tight">Управление студентами</h2>
+                    <h2 className="text-lg font-black tracking-tight">{t.studentManagement}</h2>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                     <div className="relative flex items-center h-[38px] flex-1 lg:flex-initial">
                       <Search size={14} className="absolute left-3 text-zinc-400" />
                       <input 
                         type="text" 
-                        placeholder="Поиск..." 
+                        placeholder={t.searchPlaceholder}
                         value={studentSearch}
                         onChange={(e) => setStudentSearch(e.target.value)}
                         className="w-full pl-9 pr-4 h-full bg-bento-bg/50 dark:bg-zinc-900/40 border border-bento-border rounded-xl text-[11px] outline-none focus:border-zinc-400 dark:focus:border-zinc-500 lg:min-w-[150px] text-bento-text-main transition-all"
@@ -3152,11 +3209,11 @@ export const AdminPanel: React.FC<Props> = ({
                       className="flex items-center gap-2 px-3 h-[38px] bg-bento-bg border border-bento-border rounded-xl hover:bg-indigo-600/10 hover:text-indigo-600 dark:hover:bg-indigo-500/20 dark:hover:text-indigo-400 text-[10px] font-black transition-colors uppercase tracking-widest whitespace-nowrap"
                     >
                       <Download size={14} className="text-indigo-600" />
-                      Шаблон
+                      {t.template}
                     </button>
                     <label className="flex items-center gap-2 px-3 h-[38px] bg-bento-bg border border-bento-border rounded-xl hover:bg-indigo-600/10 hover:text-indigo-600 dark:hover:bg-indigo-500/20 dark:hover:text-indigo-400 cursor-pointer text-[10px] font-black transition-colors uppercase tracking-widest whitespace-nowrap">
                       <FileSpreadsheet size={14} className="text-green-600" />
-                      Импорт
+                      {t.import}
                       <input type="file" className="hidden" accept=".xlsx,.xls" onChange={handleStudentImport} />
                     </label>
                     <button 
@@ -3251,7 +3308,7 @@ export const AdminPanel: React.FC<Props> = ({
                                 initial={{ opacity: 0, y: -5, scale: 0.98 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -5, scale: 0.98 }}
-                                className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl z-[60] overflow-hidden -mt-1"
+                                className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl z-[60] overflow-hidden -mt-1"
                               >
                                 <div className="max-h-[180px] overflow-y-auto p-1 py-1.5 space-y-0.5">
                                   {groups.filter(g => g.name.toLowerCase().includes(newGroupName.toLowerCase())).length > 0 ? (
@@ -3269,7 +3326,7 @@ export const AdminPanel: React.FC<Props> = ({
                                           newStudent.groupId === g.id 
                                             ? (theme === 'dark' ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black")
                                             : theme === 'dark'
-                                              ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                              ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                               : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                                         )}
                                       >
@@ -3352,7 +3409,7 @@ export const AdminPanel: React.FC<Props> = ({
                     const group = groups.find(g => g.id === student.groupId);
                     if (!group) return acc;
                     if (!acc[group.id]) acc[group.id] = { name: group.name, subgroups: {} };
-                    const subgroup = student.subgroup || 'Общая группа';
+                    const subgroup = student.subgroup || t.generalGroup;
                     if (!acc[group.id].subgroups[subgroup]) acc[group.id].subgroups[subgroup] = [];
                     acc[group.id].subgroups[subgroup].push(student);
                     return acc;
@@ -3360,7 +3417,7 @@ export const AdminPanel: React.FC<Props> = ({
                     const group = groups.find(g => g.id === student.groupId);
                     if (!group) return acc;
                     if (!acc[group.id]) acc[group.id] = { name: group.name, subgroups: {} };
-                    const subgroup = student.subgroup || 'Общая группа';
+                    const subgroup = student.subgroup || t.generalGroup;
                     if (!acc[group.id].subgroups[subgroup]) acc[group.id].subgroups[subgroup] = [];
                     acc[group.id].subgroups[subgroup].push(student);
                     return acc;
@@ -3378,7 +3435,7 @@ export const AdminPanel: React.FC<Props> = ({
                               <span className="font-black text-sm uppercase tracking-tight text-bento-text-main dark:text-zinc-200">{groupData.name}</span>
                               <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 text-[8px] font-black uppercase">{groups.find(g => g.id === groupId)?.language || 'ru'}</span>
                             </div>
-                            <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{Object.values(groupData.subgroups).flat().length} студентов</span>
+                            <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">{formatStudentCount(Object.values(groupData.subgroups).flat().length, language)}</span>
                           </div>
                           <ChevronDown className={cn("transition-transform duration-300", expandedGroups[groupId] && "rotate-180")} />
                         </div>
@@ -3389,13 +3446,13 @@ export const AdminPanel: React.FC<Props> = ({
                           <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
                             <div className="p-2 space-y-2">
                               {Object.entries(groupData.subgroups).map(([subgroup, subgroupStudents], subIdx) => (
-                                <div key={`${subgroup}-${subIdx}`} className="rounded-xl border border-bento-border bg-bento-bg/30">
+                                <div key={`${subgroup}-${subIdx}`} className="rounded-xl border border-bento-border bg-bento-bg/30 dark:bg-bento-card">
                                   <div className="p-3 dark:bg-transparent border-b border-bento-border/50">
                                     <h4 className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em]">{subgroup}</h4>
                                   </div>
                                   <div className="divide-y divide-bento-border/30">
                                     {subgroupStudents.map((s, sIdx) => (
-                                      <div key={`s-${s.id}-${sIdx}`} className="flex items-center justify-between p-2 px-3 hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors group rounded-xl">
+                                      <div key={`s-${s.id}-${sIdx}`} className="flex items-center justify-between p-2 px-3 bg-transparent dark:bg-bento-card hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors group rounded-xl">
                                         <div className="flex items-center gap-3">
                                           <input 
                                             type="checkbox"
@@ -3518,7 +3575,7 @@ export const AdminPanel: React.FC<Props> = ({
                          <input
                            type="text"
                            value={isThemeSelectOpen ? themeSearch : newQuestion.theme}
-                           placeholder="Поиск тем..."
+                           placeholder={t.searchTheme}
                            onFocus={() => {
                              setIsThemeSelectOpen(true);
                              setThemeSearch("");
@@ -3528,7 +3585,7 @@ export const AdminPanel: React.FC<Props> = ({
                              setThemeSearch(e.target.value);
                            }}
                            className={cn(
-                             "requested-surface w-full h-[42px] border-2 border-bento-border px-5 flex items-center justify-between text-sm font-black text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
+                             "requested-surface dark:bg-bento-card w-full h-[42px] border-2 border-bento-border px-5 flex items-center justify-between text-sm font-black text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
                              isThemeSelectOpen ? "rounded-t-xl" : "rounded-xl"
                            )}
                          />
@@ -3543,7 +3600,7 @@ export const AdminPanel: React.FC<Props> = ({
                                initial={{ opacity: 0, y: -5 }}
                                animate={{ opacity: 1, y: 0 }}
                                exit={{ opacity: 0, y: -5 }}
-                               className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl overflow-hidden z-[110] -mt-0.5 flex flex-col"
+                               className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl overflow-hidden z-[110] -mt-0.5 flex flex-col"
                              >
                                <div className="max-h-[200px] overflow-y-auto p-1 py-1.5 space-y-0.5 custom-scrollbar">
                                  {themeSearch.trim() && !examThemes.some(t => t.name.toLowerCase() === themeSearch.toLowerCase()) && (
@@ -3568,7 +3625,7 @@ export const AdminPanel: React.FC<Props> = ({
                                          newQuestion.theme === theme.name 
                                            ? (isDarkTheme ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black") 
                                            : isDarkTheme
-                                              ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                              ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                               : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                                        )}
                                      >
@@ -3610,7 +3667,7 @@ export const AdminPanel: React.FC<Props> = ({
                        <button
                          onClick={() => setIsLanguageSelectOpen(!isLanguageSelectOpen)}
                          className={cn(
-                           "requested-surface w-full h-[42px] border-2 border-bento-border px-5 flex items-center justify-between text-[11px] font-black text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
+                           "requested-surface dark:bg-bento-card w-full h-[42px] border-2 border-bento-border px-5 flex items-center justify-between text-[11px] font-black text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
                            isLanguageSelectOpen ? "rounded-t-xl border-b-transparent" : "rounded-xl"
                          )}
                        >
@@ -3624,7 +3681,7 @@ export const AdminPanel: React.FC<Props> = ({
                              initial={{ opacity: 0, y: -5 }}
                              animate={{ opacity: 1, y: 0 }}
                              exit={{ opacity: 0, y: -5 }}
-                             className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl overflow-hidden z-[110] -mt-0.5"
+                             className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl overflow-hidden z-[110] -mt-0.5"
                            >
                              {(['ru', 'uz', 'en'] as Language[]).map(lang => (
                                <button
@@ -3635,7 +3692,7 @@ export const AdminPanel: React.FC<Props> = ({
                                  }}
                                  className={cn(
                                    "w-full px-5 py-3 text-left text-xs font-black uppercase transition-all border flex items-center justify-between",
-                                   creationLanguage === lang ? (isDarkTheme ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black") : isDarkTheme ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10" : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
+                                   creationLanguage === lang ? (isDarkTheme ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black") : isDarkTheme ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10" : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                                  )}
                                >
                                  <span>{lang === 'ru' ? 'RU' : lang === 'uz' ? 'UZ' : 'EN'}</span>
@@ -3654,7 +3711,7 @@ export const AdminPanel: React.FC<Props> = ({
                         <button
                           onClick={() => setIsQuestionTypeSelectOpen(!isQuestionTypeSelectOpen)}
                           className={cn(
-                            "requested-surface w-full h-[42px] border-2 border-bento-border px-5 flex items-center justify-between text-[11px] font-black text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
+                            "requested-surface dark:bg-bento-card w-full h-[42px] border-2 border-bento-border px-5 flex items-center justify-between text-[11px] font-black text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
                             isQuestionTypeSelectOpen ? "rounded-t-xl border-b-transparent" : "rounded-xl"
                           )}
                         >
@@ -3670,14 +3727,14 @@ export const AdminPanel: React.FC<Props> = ({
                               initial={{ opacity: 0, y: -5 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -5 }}
-                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl overflow-hidden z-[110] -mt-0.5"
+                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl overflow-hidden z-[110] -mt-0.5"
                             >
                               <div className="p-1 py-1.5 space-y-0.5 max-h-[260px] overflow-y-auto custom-scrollbar">
                                 {[
-                                  { id: 'single', label: 'Один ответ' },
-                                  { id: 'multiple', label: 'Несколько ответов' },
-                                  { id: 'true_false', label: 'Верно/Неверно' },
-                                  { id: 'find_on_model', label: 'Найди на модели' }
+                                  { id: 'single', label: t.singleAnswer },
+                                  { id: 'multiple', label: t.multipleAnswer },
+                                  { id: 'true_false', label: t.trueFalse },
+                                  { id: 'find_on_model', label: t.findOnModel }
                                 ].map((type) => (
                                   <button
                                     key={type.id}
@@ -3693,7 +3750,7 @@ export const AdminPanel: React.FC<Props> = ({
                                           ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" 
                                           : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black"
                                         : isDarkTheme
-                                          ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                          ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                           : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                                     )}
                                   >
@@ -3714,7 +3771,7 @@ export const AdminPanel: React.FC<Props> = ({
                         <button
                           onClick={() => setIsCorrectAnswerSelectOpen(!isCorrectAnswerSelectOpen)}
                           className={cn(
-                            "requested-surface w-full h-[42px] border-2 border-bento-border px-5 flex items-center justify-between text-sm font-black text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
+                            "requested-surface dark:bg-bento-card w-full h-[42px] border-2 border-bento-border px-5 flex items-center justify-between text-sm font-black text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
                             isCorrectAnswerSelectOpen ? "rounded-t-xl border-b-transparent" : "rounded-xl"
                           )}
                         >
@@ -3736,7 +3793,7 @@ export const AdminPanel: React.FC<Props> = ({
                               initial={{ opacity: 0, y: -5 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -5 }}
-                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl overflow-hidden z-[110] -mt-0.5"
+                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl overflow-hidden z-[110] -mt-0.5"
                             >
                       <div className="p-1 py-1.5 space-y-0.5 max-h-[260px] overflow-y-auto custom-scrollbar">
                         {newQuestion.type === 'find_on_model' ? (
@@ -3754,7 +3811,7 @@ export const AdminPanel: React.FC<Props> = ({
                                     ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" 
                                     : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black"
                                   : isDarkTheme
-                                    ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                    ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                     : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                               )}
                             >
@@ -3787,7 +3844,7 @@ export const AdminPanel: React.FC<Props> = ({
                                   ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" 
                                   : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black"
                                 : isDarkTheme
-                                  ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                  ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                   : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                             )}
                           >
@@ -3830,7 +3887,7 @@ export const AdminPanel: React.FC<Props> = ({
                               setMediaSearch(e.target.value);
                             }}
                             className={cn(
-                              "requested-surface w-full border-2 border-bento-border px-4 py-2.5 text-sm font-bold text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all pr-24 h-[42px]",
+                              "requested-surface dark:bg-bento-card w-full border-2 border-bento-border px-4 py-2.5 text-sm font-bold text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all pr-24 h-[42px]",
                               isImageSelectOpen ? "rounded-t-xl" : "rounded-xl"
                             )}
                           />
@@ -3855,7 +3912,7 @@ export const AdminPanel: React.FC<Props> = ({
                               initial={{ opacity: 0, y: -5, scale: 0.98 }}
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: -5, scale: 0.98 }}
-                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl z-50 overflow-hidden flex flex-col -mt-1"
+                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl z-50 overflow-hidden flex flex-col -mt-1"
                             >
                               <div className="max-h-[180px] overflow-y-auto p-1 py-1.5 space-y-0.5 custom-scrollbar">
                                 {mediaLibrary
@@ -3877,7 +3934,7 @@ export const AdminPanel: React.FC<Props> = ({
                                             ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" 
                                             : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black"
                                           : isDarkTheme
-                                            ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                            ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                             : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                                       )}
                                     >
@@ -3921,7 +3978,7 @@ export const AdminPanel: React.FC<Props> = ({
                               setMediaSearch(e.target.value);
                             }}
                             className={cn(
-                              "requested-surface w-full border-2 border-bento-border px-4 py-2.5 text-sm font-bold text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all pr-24 h-[42px]",
+                              "requested-surface dark:bg-bento-card w-full border-2 border-bento-border px-4 py-2.5 text-sm font-bold text-bento-text-main outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all pr-24 h-[42px]",
                               isModelSelectOpen ? "rounded-t-xl" : "rounded-xl"
                             )}
                           />
@@ -3946,7 +4003,7 @@ export const AdminPanel: React.FC<Props> = ({
                               initial={{ opacity: 0, y: -5, scale: 0.98 }}
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: -5, scale: 0.98 }}
-                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl z-50 overflow-hidden flex flex-col -mt-1"
+                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl z-50 overflow-hidden flex flex-col -mt-1"
                             >
                               <div className="max-h-[180px] overflow-y-auto p-1 py-1.5 space-y-0.5 custom-scrollbar">
                                 {mediaLibrary
@@ -3968,7 +4025,7 @@ export const AdminPanel: React.FC<Props> = ({
                                             ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" 
                                             : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black"
                                           : isDarkTheme
-                                            ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                            ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                             : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                                       )}
                                     >
@@ -4024,7 +4081,7 @@ export const AdminPanel: React.FC<Props> = ({
                                     const input = e.currentTarget.querySelector('input');
                                     if (input) input.focus();
                                   }}
-                                  className="requested-surface relative flex items-center gap-3 border border-bento-border rounded-2xl p-2 transition-all hover:border-indigo-400 group-hover:border-indigo-500/50 overflow-hidden cursor-text"
+                                  className="requested-surface dark:bg-bento-card relative flex items-center gap-3 border border-bento-border rounded-2xl p-2 transition-all hover:border-indigo-400 group-hover:border-indigo-500/50 overflow-hidden cursor-text"
                                 >
                                   <div className={cn(
                                     "w-10 h-10 rounded-xl border flex items-center justify-center text-xs font-black transition-all shrink-0",
@@ -4143,12 +4200,7 @@ export const AdminPanel: React.FC<Props> = ({
                                       <div>
                                         <h4 className="text-sm font-black uppercase tracking-widest text-bento-text-main">{themeName}</h4>
                                         <p className="text-[10px] font-bold text-zinc-400 uppercase mt-0.5">
-                                          {themeQuestions.length} {
-                                            language === 'ru' 
-                                              ? (themeQuestions.length % 10 === 1 && themeQuestions.length % 100 !== 11 ? 'вопрос' : 
-                                                 [2, 3, 4].includes(themeQuestions.length % 10) && ![12, 13, 14].includes(themeQuestions.length % 100) ? 'вопроса' : 'вопросов')
-                                              : t.questions
-                                          }
+                                          {formatQuestionCount(themeQuestions.length, language)}
                                         </p>
                                       </div>
                                     </div>
@@ -4178,7 +4230,7 @@ export const AdminPanel: React.FC<Props> = ({
                                                       {language === 'ru' ? 'Вопрос' : language === 'uz' ? 'Savol' : 'Question'} {idx + 1}
                                                     </span>
                                                     <span className="text-[9px] font-black text-zinc-400 dark:text-zinc-500 bg-zinc-400/10 px-2.5 py-0.5 rounded-full uppercase tracking-widest border border-zinc-400/20">
-                                                      {q.type === 'single' ? t.singleAnswer : q.type === 'multiple' ? t.multipleAnswer : q.type === 'find_on_model' ? 'Найди на модели' : t.trueFalse}
+                                                      {q.type === 'single' ? t.singleAnswer : q.type === 'multiple' ? t.multipleAnswer : q.type === 'find_on_model' ? t.findOnModel : t.trueFalse}
                                                     </span>
                                                   </div>
                                                   <h4 className={cn("font-bold leading-tight text-xs", theme === 'dark' ? "text-white" : "text-zinc-900")}>{q.text}</h4>
@@ -4193,7 +4245,7 @@ export const AdminPanel: React.FC<Props> = ({
                                                 {q.type === 'find_on_model' ? (
                                                   <div className="col-span-full p-2 rounded-xl border border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400 font-bold text-[10px] flex items-center gap-2 max-w-fit">
                                                     <div className="w-5 h-5 flex items-center justify-center rounded-md bg-emerald-600 text-white font-black text-[9px]">✓</div>
-                                                    <span className="uppercase tracking-widest text-[9px]">Правильная часть: {q.correctAnswer}</span>
+                                                    <span className="uppercase tracking-widest text-[9px]">{t.correctPart}: {q.correctAnswer}</span>
                                                   </div>
                                                 ) : Object.entries(q.options).map(([key, value], oIdx) => {
                                                   if (!value) return null;
@@ -4268,12 +4320,12 @@ export const AdminPanel: React.FC<Props> = ({
                           onChange={(event) => setResultsUniversityName(event.target.value)}
                           className="min-w-[200px] flex-1 px-4 py-3 bg-bento-bg border border-bento-border rounded-xl text-xs font-medium text-bento-text-main focus:border-indigo-500 outline-none"
                           style={{ maxWidth: 'calc(100% - 20px)' }}
-                          placeholder={language === 'ru' ? 'Название ВУЗа' : 'OTM nomi'}
-                          aria-label={language === 'ru' ? 'Название ВУЗа' : 'OTM nomi'}
+                          placeholder={t.universityName}
+                          aria-label={t.universityName}
                         />
                         <label className="relative flex items-center gap-2 px-4 py-3 bg-bento-bg border border-bento-border rounded-xl text-xs font-bold cursor-pointer hover:border-indigo-500 transition-colors">
                           <Upload size={15} />
-                          <span>{language === 'ru' ? 'Фото логотипа' : 'Logotip rasmi'}</span>
+                          <span>{t.logoPhoto}</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -4293,7 +4345,7 @@ export const AdminPanel: React.FC<Props> = ({
                           }}
                           className="ml-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
                         >
-                          {language === 'ru' ? 'Сохранить' : 'Saqlash'}
+                          {t.save}
                         </button>
                       </div>
                     ) : (
@@ -4310,7 +4362,7 @@ export const AdminPanel: React.FC<Props> = ({
                       type="button"
                       onClick={() => setIsResultsBrandingOpen(true)}
                       className="shrink-0 ml-6 rounded-2xl cursor-pointer hover:ring-2 hover:ring-indigo-500/50 transition-all"
-                      title={language === 'ru' ? 'Изменить логотип и название' : 'Logotip va nomni tahrirlash'}
+                      title={t.editLogoAndName}
                     >
                       <img
                         src={resultsUniversityLogo}
@@ -4324,7 +4376,7 @@ export const AdminPanel: React.FC<Props> = ({
                       onClick={() => setIsResultsBrandingOpen(true)}
                       className="shrink-0 ml-6 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
                     >
-                      {language === 'ru' ? 'Добавить' : 'Qo‘shish'}
+                      {t.add}
                     </button>
                   ) : (
                     <Trophy size={32} className="text-yellow-500" />
@@ -4370,7 +4422,7 @@ export const AdminPanel: React.FC<Props> = ({
                   {results.reduce((acc, result) => {
                     const group = result.groupName;
                     const student = students.find(s => (s.firstName + ' ' + s.lastName).trim() === result.studentName.trim());
-                    const subgroup = student?.subgroup || 'Общая группа';
+                    const subgroup = student?.subgroup || t.generalGroup;
                     
                     if (!acc[group]) acc[group] = {};
                     if (!acc[group][subgroup]) acc[group][subgroup] = [];
@@ -4379,7 +4431,7 @@ export const AdminPanel: React.FC<Props> = ({
                   }, {} as Record<string, Record<string, typeof results>>) && Object.entries(results.reduce((acc, result) => {
                     const group = result.groupName;
                     const student = students.find(s => (s.firstName + ' ' + s.lastName).trim() === result.studentName.trim());
-                    const subgroup = student?.subgroup || 'Общая группа';
+                    const subgroup = student?.subgroup || t.generalGroup;
                     
                     if (!acc[group]) acc[group] = {};
                     if (!acc[group][subgroup]) acc[group][subgroup] = [];
@@ -4400,7 +4452,7 @@ export const AdminPanel: React.FC<Props> = ({
                              )}
                            </h4>
                         </div>
-                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{Object.values(subgroups).flat().length} рез.</span>
+                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{t.resultsCount.replace('{count}', String(Object.values(subgroups).flat().length))}</span>
                       </div>
                       <div className="p-4 space-y-4">
                         {Object.entries(subgroups).map(([subgroupName, subgroupResults], sIdx) => (
@@ -4410,7 +4462,7 @@ export const AdminPanel: React.FC<Props> = ({
                               <table className="w-full text-left text-xs bg-bento-card">
                                 <thead className="bg-transparent text-[9px] font-black uppercase text-zinc-500 border-b border-bento-border/30">
                                   <tr>
-                                    <th className="px-4 py-3">{language === 'ru' ? 'Студент' : language === 'uz' ? 'Talaba' : 'Student'}</th>
+                                    <th className="px-4 py-3">                                    {t.students}</th>
                                     <th className="px-4 py-3">{t.theme}</th>
                                     <th className="px-4 py-3">{t.score}</th>
                                     <th className="px-4 py-3">{t.percentage}</th>
@@ -4552,22 +4604,22 @@ export const AdminPanel: React.FC<Props> = ({
                   <div className={cn(
                     "flex-1 flex flex-col min-h-0 rounded-3xl border overflow-hidden transition-all duration-300 shadow-lg select-none relative",
                     isDarkTheme 
-                      ? "bg-[#111317]/95 border-zinc-800/40 text-zinc-100" 
+                      ? "bg-bento-card border-zinc-800/40 text-zinc-100"
                       : "bg-white/95 border-zinc-200/80 text-zinc-800 shadow-[0_4px_20px_rgba(0,0,0,0.05)]"
                   )}>
                     {/* 1. Word Menu Header Tabs Row */}
                     <div className={cn(
                       "flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 border-b transition-all duration-300",
                       isDarkTheme 
-                        ? "bg-[#171921] dark:bg-zinc-950 border-zinc-800/50" 
+                        ? "bg-bento-card border-zinc-800/50"
                         : "bg-zinc-50 border-zinc-200/80"
                     )}>
                       <div className="flex items-center gap-1">
                         {[
-                          { id: 'palettes' as const, labelRu: '🎨 Мед-Палитры', labelUz: '🎨 Tibbiy Palitralar' },
-                          { id: 'segments' as const, labelRu: '🗂️ Сегменты', labelUz: '🗂️ Segmentlar' },
-                          { id: 'shader' as const, labelRu: '🌌 Шейдер', labelUz: '🌌 Sheyder' },
-                          { id: 'hud' as const, labelRu: '⚙️ HUD', labelUz: '⚙️ HUD' }
+                          { id: 'palettes' as const, label: `🎨 ${t.medicalPalettes}` },
+                          { id: 'segments' as const, label: `🗂️ ${t.modelSegments}` },
+                          { id: 'shader' as const, label: `🌌 ${t.shaderLightingModes}` },
+                          { id: 'hud' as const, label: '⚙️ HUD' }
                         ].map((tab) => (
                           <button
                             key={tab.id}
@@ -4577,21 +4629,21 @@ export const AdminPanel: React.FC<Props> = ({
                               "px-3 py-1.5 text-[10px] font-black uppercase tracking-wider relative transition-all cursor-pointer border-b-2",
                               activeRibbon3D === tab.id
                                 ? isDarkTheme
-                                  ? "border-indigo-500 text-indigo-455 bg-black/30 font-extrabold"
+                                  ? "border-indigo-500 text-indigo-455 bg-bento-card font-extrabold"
                                   : "border-indigo-600 text-indigo-650 bg-indigo-50 font-extrabold"
                                 : isDarkTheme
-                                  ? "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-black/10"
+                                  ? "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-bento-card"
                                   : "border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100"
                             )}
                           >
-                            {language === 'ru' ? tab.labelRu : tab.labelUz}
+                            {tab.label}
                           </button>
                         ))}
                       </div>
 
                       {/* General header utilities shifted directly inside the ribbon line */}
                       <div className="flex items-center gap-3">
-                        <div className="flex bg-zinc-150 dark:bg-[#111317] p-1 rounded-xl border border-zinc-800/50 text-xs">
+                        <div className="flex bg-zinc-150 dark:bg-bento-card p-1 rounded-xl border border-zinc-800/50 text-xs">
                           <button
                             onClick={() => setTerminalBg3D('dark')}
                             className={cn(
@@ -4623,9 +4675,7 @@ export const AdminPanel: React.FC<Props> = ({
                             const name = currentPart ? (language === 'ru' ? currentPart.nameRu : currentPart.nameUz) : selectedPartId3D;
                             
                             setNewQuestion({
-                              text: language === 'ru' 
-                                ? `Найдите следующую деталь на 3D-модели: "${name}"` 
-                                : `Ushbu qismni 3D modelda ko‘rsating: "${name}"`,
+                              text: t.findNextModelPart.replace('{part}', name),
                               theme: 'Anatomy (3D)',
                               language: language,
                               type: 'find_on_model',
@@ -4642,7 +4692,7 @@ export const AdminPanel: React.FC<Props> = ({
                           className="flex items-center justify-center gap-1 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-black text-[9px] uppercase tracking-wider py-1.5 px-3 rounded-xl shadow-[0_2px_12px_rgba(99,102,241,0.2)] hover:shadow-indigo-500/20 active:scale-[0.98] transition-all cursor-pointer"
                         >
                           <Plus size={11} />
-                          {language === 'ru' ? 'создать вопрос' : 'savol yaratish'}
+                          {t.createModelQuestion}
                         </button>
                       </div>
                     </div>
@@ -4650,8 +4700,8 @@ export const AdminPanel: React.FC<Props> = ({
                     {/* 2. Word Sub-Toolbar Body Panel */}
                     <div className={cn(
                       "p-3 min-h-[84px] flex items-center border-t transition-all duration-300",
-                      isDarkTheme 
-                        ? "bg-zinc-900/60 dark:bg-[#151720] border-zinc-800/40" 
+                      isDarkTheme
+                        ? "bg-bento-card border-zinc-800/40"
                         : "bg-white border-zinc-200/80 text-zinc-850"
                     )}>
                       <AnimatePresence mode="wait">
@@ -4667,7 +4717,7 @@ export const AdminPanel: React.FC<Props> = ({
                               "text-[10px] font-black uppercase tracking-widest shrink-0 select-none mr-2",
                               isDarkTheme ? "text-[#a5b4fc]" : "text-indigo-600"
                             )}>
-                              🎨 {language === 'ru' ? 'Предустановленные мед-палитры:' : 'Tibbiy rangli palitralar:'}
+                              🎨 {t.medicalPalettes}
                             </span>
                             <div className="flex flex-wrap gap-1.5">
                               {CLINICAL_PALETTES.map((pal) => (
@@ -4677,17 +4727,17 @@ export const AdminPanel: React.FC<Props> = ({
                                   className={cn(
                                     "px-3 py-1.5 border rounded-xl text-[9px] font-black uppercase tracking-wide transition-all flex items-center gap-2 cursor-pointer active:scale-95",
                                     isDarkTheme
-                                      ? "bg-black/35 hover:bg-indigo-500/15 border-zinc-800 hover:border-indigo-500/30 text-zinc-400 hover:text-indigo-400"
+                                      ? "bg-bento-card hover:bg-indigo-500/15 border-zinc-800 hover:border-indigo-500/30 text-zinc-400 hover:text-indigo-400"
                                       : "bg-zinc-50 hover:bg-indigo-50 border-zinc-200 hover:border-indigo-200 text-zinc-600 hover:text-indigo-700"
                                   )}
-                                  title={language === 'ru' ? `Применить: ${pal.nameRu}` : `Palitrani qo'llash`}
+                                  title={t.applyPalette}
                                 >
                                   <div className="flex gap-0.5">
                                     {pal.colors.slice(0, 3).map((col) => (
                                       <span key={col} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: col }} />
                                     ))}
                                   </div>
-                                  <span>{language === 'ru' ? pal.nameRu : pal.nameUz}</span>
+                                  <span>{language === 'ru' ? pal.nameRu : language === 'uz' ? pal.nameUz : pal.nameEn}</span>
                                 </button>
                               ))}
                             </div>
@@ -4705,7 +4755,7 @@ export const AdminPanel: React.FC<Props> = ({
                             {/* Left: list of segments selection */}
                             <div className="xl:col-span-5 flex flex-col gap-1">
                               <span className="text-[8px] font-black text-zinc-550 uppercase tracking-widest block mb-1">
-                                {language === 'ru' ? 'ВЫБЕРИТЕ СЕГМЕНТ:' : 'SEGMENT TANLANG:'}
+                                {t.chooseSegment}
                               </span>
                               <div className="flex items-center gap-2 overflow-x-auto py-0.5 max-w-full">
                                 {Object.entries(modelLabels[activeModelKey3D] || {}).map(([partKey, info]) => {
@@ -4719,13 +4769,13 @@ export const AdminPanel: React.FC<Props> = ({
                                         isActive
                                           ? "bg-indigo-500/15 border-indigo-500 text-indigo-600 dark:text-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.1)]"
                                           : isDarkTheme
-                                            ? "bg-black/30 border-zinc-800 hover:border-zinc-700 hover:bg-black/50 text-zinc-400"
+                                            ? "bg-bento-card border-zinc-800 hover:border-zinc-700 hover:bg-bento-card text-zinc-400"
                                             : "bg-zinc-50 border-zinc-200 hover:border-zinc-350 hover:bg-zinc-100/50 text-zinc-655"
                                       )}
                                     >
                                       <span className="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: info.color }} />
                                       <div className="leading-none text-[9px]">
-                                        <p className="font-extrabold truncate max-w-[120px]">{language === 'ru' ? info.nameRu : info.nameUz}</p>
+                                        <p className="font-extrabold truncate max-w-[120px]">{language === 'en' ? info.nameEn || info.nameUz : language === 'ru' ? info.nameRu : info.nameUz}</p>
                                         <span className="text-[7px] font-mono text-zinc-500 block">ID: {partKey}</span>
                                       </div>
                                     </button>
@@ -4749,11 +4799,11 @@ export const AdminPanel: React.FC<Props> = ({
                                           saveModelLabels(updated);
                                         }
                                       }}
-                                      placeholder="Ru name..."
+                                      placeholder={t.nameInRussian}
                                       className={cn(
                                         "px-2 py-1 text-[10px] rounded-lg font-bold outline-none border transition-all",
                                         isDarkTheme
-                                          ? "bg-black/40 border-zinc-800 text-zinc-300 focus:border-indigo-500"
+                                          ? "bg-bento-card border-zinc-800 text-zinc-300 focus:border-indigo-500"
                                           : "bg-zinc-50 border-zinc-200 text-zinc-800 focus:border-indigo-500 focus:bg-white"
                                       )}
                                     />
@@ -4767,17 +4817,17 @@ export const AdminPanel: React.FC<Props> = ({
                                           saveModelLabels(updated);
                                         }
                                       }}
-                                      placeholder="Uz name..."
+                                      placeholder={t.nameInUzbek}
                                       className={cn(
                                         "px-2 py-1 text-[10px] rounded-lg font-bold outline-none border transition-all",
                                         isDarkTheme
-                                          ? "bg-black/40 border-zinc-800 text-zinc-300 focus:border-indigo-500"
+                                          ? "bg-bento-card border-zinc-800 text-zinc-300 focus:border-indigo-500"
                                           : "bg-zinc-50 border-zinc-200 text-zinc-800 focus:border-indigo-500 focus:bg-white"
                                       )}
                                     />
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[7.5px] font-black text-zinc-550 uppercase tracking-widest">{language === 'ru' ? 'Цвет:' : 'Rang:'}</span>
+                                    <span className="text-[7.5px] font-black text-zinc-550 uppercase tracking-widest">{t.segmentColor}</span>
                                     {['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#ef4444', '#a855f7'].map((col) => (
                                       <button
                                         key={col}
@@ -4798,7 +4848,7 @@ export const AdminPanel: React.FC<Props> = ({
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-[9px] text-zinc-550 italic font-semibold">{language === 'ru' ? 'Выберите сегмент для редактирования' : 'Segment tanlang'}</span>
+                                <span className="text-[9px] text-zinc-550 italic font-semibold">{t.selectSegmentToEdit}</span>
                               )}
                             </div>
 
@@ -4815,11 +4865,11 @@ export const AdminPanel: React.FC<Props> = ({
                                       saveModelLabels(updated);
                                     }
                                   }}
-                                  placeholder={language === 'ru' ? 'Клинические примечания...' : 'Klinik eslatmalar...'}
+                                  placeholder={t.medicalNotesPlaceholder}
                                   className={cn(
                                     "w-full h-11 p-1.5 rounded-lg text-[9px] outline-none border resize-none font-medium leading-none text-left transition-all",
                                     isDarkTheme
-                                      ? "bg-black/40 border-zinc-850 text-zinc-300 placeholder:text-zinc-650 focus:border-indigo-500"
+                                      ? "bg-bento-card border-zinc-850 text-zinc-300 placeholder:text-zinc-650 focus:border-indigo-500"
                                       : "bg-zinc-50 border-zinc-200 text-zinc-800 placeholder:text-zinc-400 focus:border-indigo-500 focus:bg-white"
                                   )}
                                 />
@@ -4837,12 +4887,12 @@ export const AdminPanel: React.FC<Props> = ({
                             className="flex items-center gap-2.5 w-full overflow-x-auto py-1"
                           >
                             <span className="text-[10px] font-black uppercase tracking-widest text-[#10b981] shrink-0 select-none mr-2">
-                              🌌 {language === 'ru' ? 'Режимы Шейдеров / Освещения:' : 'Sheyderlar Va Yorug‘lik:'}
+                              🌌 {t.shaderLightingModes}
                             </span>
                             {[
-                              { id: 'clinical', label: '☀️', textRu: 'Клинический (Clinical)', textUz: 'Kunduzgi' },
-                              { id: 'xray', label: '🧬', textRu: 'Рентген X-Ray (Translucent)', textUz: 'Rentgen' },
-                              { id: 'cinematic', label: '🌌', textRu: 'Неоновый (Ambient Neon)', textUz: 'Neon' }
+                              { id: 'clinical', label: '☀️', text: t.clinicalLighting },
+                              { id: 'xray', label: '🧬', text: t.xrayLighting },
+                              { id: 'cinematic', label: '🌌', text: t.neonLighting }
                             ].map((preset) => (
                               <button
                                 key={preset.id}
@@ -4853,12 +4903,12 @@ export const AdminPanel: React.FC<Props> = ({
                                   lightingPreset3D === preset.id
                                     ? "bg-emerald-500/15 border-emerald-500/60 text-emerald-600 dark:text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.15)]"
                                     : isDarkTheme
-                                      ? "bg-black/30 border-zinc-800 hover:bg-black/55 text-zinc-500 hover:text-zinc-350"
+                                      ? "bg-bento-card border-zinc-800 hover:bg-bento-card text-zinc-500 hover:text-zinc-350"
                                       : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100 text-zinc-600 hover:text-zinc-800"
                                 )}
                               >
                                 <span className="text-sm">{preset.label}</span>
-                                <span>{language === 'ru' ? preset.textRu : preset.textUz}</span>
+                                <span>{preset.text}</span>
                               </button>
                             ))}
                           </motion.div>
@@ -4881,7 +4931,7 @@ export const AdminPanel: React.FC<Props> = ({
                                 blenderLoopMode
                                   ? "bg-indigo-500/15 border-indigo-500 text-indigo-650 dark:text-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.25)]"
                                   : isDarkTheme
-                                    ? "bg-black/30 border-zinc-800 text-zinc-500 hover:border-zinc-750 hover:text-zinc-350"
+                                    ? "bg-bento-card border-zinc-800 text-zinc-500 hover:border-zinc-750 hover:text-zinc-350"
                                     : "bg-zinc-50 border-zinc-200 text-zinc-650 hover:bg-zinc-100 hover:text-zinc-800"
                               )}
                             >
@@ -4889,7 +4939,7 @@ export const AdminPanel: React.FC<Props> = ({
                                 <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-indigo-400", !blenderLoopMode && "hidden")}></span>
                                 <span className={cn("relative inline-flex rounded-full h-2 w-2", blenderLoopMode ? "bg-indigo-500" : "bg-zinc-650")}></span>
                               </span>
-                              <span>🔄 {language === 'ru' ? 'Blender Петли/Циклы' : 'Blender tsikllari'}</span>
+                              <span>🔄 {t.blenderLoops}</span>
                             </button>
 
                             <div className="h-6 w-px bg-zinc-800 shrink-0" />
@@ -4903,12 +4953,12 @@ export const AdminPanel: React.FC<Props> = ({
                                 isolateMode3D
                                   ? "bg-indigo-500/15 border-indigo-500/60 text-indigo-600 dark:text-indigo-400"
                                   : isDarkTheme
-                                    ? "bg-black/30 border-zinc-805 hover:bg-black/55 text-zinc-400 hover:text-white"
+                                    ? "bg-bento-card border-zinc-805 hover:bg-bento-card text-zinc-400 hover:text-white"
                                     : "bg-zinc-50 border-zinc-200 text-zinc-650 hover:bg-zinc-100 hover:text-zinc-800"
                               )}
                             >
                               <span className="text-sm">🎯</span>
-                              <span>{language === 'ru' ? 'Режим Изоляции' : 'Izolyatsiya'}</span>
+                              <span>{t.isolationMode}</span>
                             </button>
 
                             {/* Spin Button */}
@@ -4920,12 +4970,12 @@ export const AdminPanel: React.FC<Props> = ({
                                 autoRotate3D
                                   ? "bg-amber-500/15 border-amber-500/60 text-amber-600 dark:text-amber-450"
                                   : isDarkTheme
-                                    ? "bg-black/30 border-zinc-805 hover:bg-black/55 text-zinc-405 hover:text-white"
+                                    ? "bg-bento-card border-zinc-805 hover:bg-bento-card text-zinc-405 hover:text-white"
                                     : "bg-zinc-50 border-zinc-200 text-zinc-650 hover:bg-zinc-100 hover:text-zinc-800"
                               )}
                             >
                               <span className={cn("text-sm inline-block", autoRotate3D && "animate-spin")}>🔄</span>
-                              <span>{language === 'ru' ? 'Авто-вращение' : 'Avto aylanish'}</span>
+                              <span>{t.autoRotation}</span>
                             </button>
 
                             {/* Simulator Button */}
@@ -4943,12 +4993,12 @@ export const AdminPanel: React.FC<Props> = ({
                                 simulatorMode3D
                                   ? "bg-rose-500/15 border-rose-500/65 text-rose-600 dark:text-rose-400 animate-pulse"
                                   : isDarkTheme
-                                    ? "bg-black/30 border-zinc-808 hover:bg-[#20181a] text-zinc-405 hover:text-white"
+                                    ? "bg-bento-card border-zinc-808 hover:bg-bento-card text-zinc-405 hover:text-white"
                                     : "bg-zinc-50 border-zinc-200 text-zinc-655 hover:bg-zinc-100 hover:text-zinc-800"
                               )}
                             >
                               <span className="text-sm">🎮</span>
-                              <span>{language === 'ru' ? 'Самопроверка' : 'Test rejimi'}</span>
+                              <span>{t.selfCheck}</span>
                             </button>
                           </motion.div>
                         )}
@@ -4966,7 +5016,7 @@ export const AdminPanel: React.FC<Props> = ({
                       className={cn(
                         "absolute left-0 top-0 bottom-0 z-30 flex flex-col min-h-0 shadow-xl border-r backdrop-blur-md w-72 md:w-80 p-4 transition-colors duration-300",
                         isDarkTheme
-                          ? "bg-[#111317]/95 border-zinc-800/80 text-zinc-100"
+                          ? "bg-bento-card border-zinc-800/80 text-zinc-100"
                           : "bg-white/95 border-zinc-200/80 text-zinc-800"
                       )}
                     >
@@ -4976,8 +5026,8 @@ export const AdminPanel: React.FC<Props> = ({
                         onClick={() => setIsLeftPanelOpen3D(!isLeftPanelOpen3D)}
                         className={cn(
                           "absolute right-[-24px] top-1/2 -translate-y-1/2 w-6 h-14 rounded-r-xl border-r border-y flex items-center justify-center cursor-pointer shadow-md select-none focus:outline-none transition-colors z-[100]",
-                          isDarkTheme 
-                            ? "bg-[#111317]/95 border-zinc-800 text-zinc-400 hover:text-white" 
+                          isDarkTheme
+                            ? "bg-bento-card border-zinc-800 text-zinc-400 hover:text-white"
                             : "bg-white border-zinc-200 text-zinc-500 hover:text-zinc-800"
                         )}
                       >
@@ -4990,7 +5040,7 @@ export const AdminPanel: React.FC<Props> = ({
                           <div className="bg-transparent border-transparent p-0 space-y-3 shrink-0">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
-                                🧠 {language === 'ru' ? '1. ВЫБОР МОДЕЛИ' : '1. MODEL TANLASH'}
+                                🧠 1. {t.select3DModel}
                               </span>
                             </div>
 
@@ -5000,11 +5050,11 @@ export const AdminPanel: React.FC<Props> = ({
                                 type="text"
                                 value={modelPanelSearch}
                                 onChange={(e) => setModelPanelSearch(e.target.value)}
-                                placeholder={language === 'ru' ? 'Поиск 3D моделей...' : '3D modellarni izlash...'}
+                                placeholder={t.search3D}
                                 className={cn(
                                   "w-full px-3 py-1.5 text-xs font-bold outline-none rounded-xl transition-all font-sans pl-8 border",
                                   isDarkTheme
-                                    ? "bg-black/40 border-zinc-850 text-zinc-200 focus:border-indigo-500/50"
+                                    ? "bg-bento-card border-zinc-850 text-zinc-200 focus:border-indigo-500/50"
                                     : "bg-zinc-50 border-zinc-200 text-zinc-800 placeholder:text-zinc-400 focus:border-indigo-500/50 focus:bg-white"
                                 )}
                               />
@@ -5065,7 +5115,7 @@ export const AdminPanel: React.FC<Props> = ({
                                         selectedModelId3D === item.id
                                           ? "bg-indigo-50/10 border-indigo-500/60 text-indigo-600 dark:text-indigo-400 shadow-sm"
                                           : isDarkTheme
-                                            ? "bg-black/30 border-zinc-800/50 hover:bg-black/50 hover:border-zinc-700 text-zinc-500"
+                                            ? "bg-bento-card border-zinc-800/50 hover:bg-bento-card hover:border-zinc-700 text-zinc-500"
                                             : "bg-zinc-50 border-zinc-200 hover:bg-zinc-100 hover:border-zinc-300 text-zinc-600 hover:text-zinc-800"
                                       )}
                                       title={language === 'ru' ? item.nameRu : item.nameUz}
@@ -5079,7 +5129,7 @@ export const AdminPanel: React.FC<Props> = ({
                                   ))}
                                   {filtered.length === 0 && (
                                     <p className="text-[10px] text-zinc-550 text-center col-span-3 py-4 italic uppercase tracking-widest leading-none">
-                                      {language === 'ru' ? 'Ничего не найдено' : 'Hech narsa topilmadi'}
+                                      {t.noModelsFound}
                                     </p>
                                   )}
                                 </div>
@@ -5260,7 +5310,7 @@ export const AdminPanel: React.FC<Props> = ({
                                  />
                                  <div className="space-y-0.5 truncate min-w-0">
                                    <p className="text-xs font-black text-bento-text-main group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors truncate">
-                                     {language === 'ru' ? info.nameRu : info.nameUz}
+                                     {language === 'en' ? info.nameEn || info.nameUz : language === 'ru' ? info.nameRu : info.nameUz}
                                    </p>
                                    <p className="text-[9px] font-mono text-zinc-400 uppercase tracking-widest truncate">
                                      Segment ID: <span className="font-bold text-zinc-500 dark:text-zinc-350">{partKey}</span>
@@ -5278,7 +5328,7 @@ export const AdminPanel: React.FC<Props> = ({
                                     setEditColor(info.color);
                                   }}
                                   className="p-1.5 text-zinc-400 hover:text-indigo-500 hover:bg-indigo-500/10 rounded-lg transition-all"
-                                  title="Edit Name"
+                                  title={t.editName}
                                 >
                                   <Edit2 size={13} />
                                 </button>
@@ -5286,7 +5336,7 @@ export const AdminPanel: React.FC<Props> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm(language === 'ru' ? `Удалить название для "${info.nameRu}"?` : 'Nomni o‘chirasizmi?')) {
+                                    if (confirm(t.confirmDeleteModelLabel)) {
                                       const updated = { ...modelLabels };
                                       updated[selectedModelId3D][partKey] = {
                                         nameRu: `${selectedModelId3D} - ${partKey}`,
@@ -5297,7 +5347,7 @@ export const AdminPanel: React.FC<Props> = ({
                                     }
                                   }}
                                   className="p-1.5 text-zinc-300 dark:text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                                  title="Delete Label text"
+                                  title={t.deleteLabel}
                                 >
                                   <Trash2 size={13} />
                                 </button>
@@ -5312,7 +5362,7 @@ export const AdminPanel: React.FC<Props> = ({
                         <div className="mt-4 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 space-y-3 relative overflow-hidden">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">
-                              📋 {language === 'ru' ? 'Клинические примечания' : 'Klinik eslatmalar'}
+                              📋 {t.clinicalNotes}
                             </span>
                             <span className="text-[9px] uppercase font-serif italic text-zinc-400">
                               {selectedPartId3D}
@@ -5332,15 +5382,11 @@ export const AdminPanel: React.FC<Props> = ({
                                 saveModelLabels(updated);
                               }
                             }}
-                            placeholder={language === 'ru' 
-                              ? 'Введите важные медицинские примечания для студентов...' 
-                              : 'Talabalar uchun muhim tibbiy eslatmalarni kiriting...'}
+                            placeholder={t.medicalNotesPlaceholder}
                             className="w-full text-xs bg-zinc-950/40 p-2.5 rounded-xl border border-bento-border/70 text-zinc-350 placeholder:text-zinc-650 min-h-[85px] outline-none focus:border-indigo-500/50 transition-all resize-none font-medium text-left"
                           />
                           <p className="text-[9px] text-zinc-550 leading-tight text-left">
-                            {language === 'ru' 
-                              ? '💡 Изменения сохраняются автоматически в реальном времени.' 
-                              : '💡 Eslatmalar real vaqt rejimida avtomatik ravishda saqlanadi.'}
+                            💡 {t.autosaveRealtime}
                           </p>
                           {/* Hide deprecated contents */}
                           <div className="hidden">
@@ -5398,7 +5444,7 @@ export const AdminPanel: React.FC<Props> = ({
                     {/* Frame container for ThreeJS canvas */}
                     <div className={cn(
                       "flex-1 min-h-[560px] xl:min-h-[640px] overflow-hidden relative group transition-all duration-300",
-                      isDarkTheme ? "bg-[#0B0D11]" : "bg-zinc-50"
+                      isDarkTheme ? "bg-bento-card" : "bg-zinc-50"
                     )}>
                       
                       {/* Active Quiz HUD Simulator Header overlay */}
@@ -5409,16 +5455,16 @@ export const AdminPanel: React.FC<Props> = ({
                         )}>
                           <div className="flex items-center justify-between">
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[8px] uppercase tracking-widest font-black rounded-lg">
-                              🟢 {language === 'ru' ? 'РЕЖИМ САМОПРОВЕРКИ' : 'O‘Z-O‘ZINI TEKSHIRISH REJIMI'}
+                              🟢 {t.simulatorMode}
                             </span>
                             <div className="text-[10px] font-mono text-zinc-350 font-black uppercase tracking-widest">
-                              {language === 'ru' ? 'Счет' : 'Natija'}: <span className="text-emerald-400 text-xs font-black">{simulatorScore.correct}</span> / {simulatorScore.total}
+                              {t.score}: <span className="text-emerald-400 text-xs font-black">{simulatorScore.correct}</span> / {simulatorScore.total}
                             </div>
                           </div>
 
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1.5 border-t border-zinc-800/40">
                             <div className="text-xs font-bold leading-relaxed text-zinc-300">
-                              {language === 'ru' ? 'Найдите и кликните деталь:' : 'Ushbu anatomik qismni toping:'}{' '}
+                              {t.findAndClickPart}{' '}
                               <span className="text-xs font-black text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-xl border border-indigo-500/20 shadow-sm">
                                 {modelLabels[activeModelKey3D]?.[simulatorTargetPart] 
                                   ? (language === 'ru' ? modelLabels[activeModelKey3D][simulatorTargetPart].nameRu : modelLabels[activeModelKey3D][simulatorTargetPart].nameUz) 
@@ -5430,7 +5476,7 @@ export const AdminPanel: React.FC<Props> = ({
                               onClick={() => setSimulatorMode3D(false)}
                               className="self-end sm:self-auto px-2 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-[8.5px] font-black uppercase tracking-wider text-red-400 transition-all cursor-pointer"
                             >
-                              {language === 'ru' ? 'Закончить' : 'Chiqish'}
+                              {t.finish}
                             </button>
                           </div>
 
@@ -5505,9 +5551,7 @@ export const AdminPanel: React.FC<Props> = ({
 
                     {/* Quick educational integration banner */}
                     <div className="p-4 m-4 mt-0 bg-zinc-55 dark:bg-zinc-800/10 rounded-2xl border border-bento-border/50 text-[10.5px] leading-relaxed text-zinc-500 dark:text-zinc-400 font-medium font-bold shrink-0">
-                      💡 {language === 'ru' 
-                        ? 'Модели полностью интерактивны. Студенты будут проходить практический тест именно в этой среде, нажимая на правильные зоны для подтверждения своих знаний!'
-                        : 'Modellar to‘liq interaktivdir. Talabalar amaliy imtihonlarni aynan shu muhitda topshirishadi va bilimlarini tasdiqlash uchun tegishli sohani tanlashadi.'}
+                      💡 {t.simulatorHelp}
                     </div>
 
                   </div>
@@ -5534,7 +5578,7 @@ export const AdminPanel: React.FC<Props> = ({
                           <input
                             type="text"
                             value={isScheduledThemeSelectOpen ? themeSearch : scheduleForm.theme}
-                            placeholder="Поиск тем..."
+                            placeholder={t.searchTheme}
                             onFocus={() => {
                               setIsScheduledThemeSelectOpen(true);
                               setThemeSearch("");
@@ -5544,7 +5588,7 @@ export const AdminPanel: React.FC<Props> = ({
                               setThemeSearch(e.target.value);
                             }}
                             className={cn(
-                              "requested-surface w-full h-[38px] border-2 border-bento-border px-4 text-xs font-black text-bento-text-main placeholder:text-zinc-400 dark:placeholder:text-zinc-500 placeholder:opacity-100 outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
+                              "requested-surface dark:bg-bento-card w-full h-[38px] border-2 border-bento-border px-4 text-xs font-black text-bento-text-main placeholder:text-zinc-400 dark:placeholder:text-zinc-500 placeholder:opacity-100 outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
                               isScheduledThemeSelectOpen ? "rounded-t-xl" : "rounded-xl"
                             )}
                           />
@@ -5559,7 +5603,7 @@ export const AdminPanel: React.FC<Props> = ({
                               initial={{ opacity: 0, y: -5 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -5 }}
-                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl shadow-xl overflow-hidden z-[120] -mt-[1px] flex flex-col"
+                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl shadow-xl overflow-hidden z-[120] -mt-[1px] flex flex-col"
                             >
                               <div className="max-h-[200px] overflow-y-auto p-1 py-1.5 space-y-0.5 custom-scrollbar">
                                 {examThemes.filter(t => t.name.toLowerCase().includes(themeSearch.toLowerCase())).map(t => (
@@ -5574,7 +5618,7 @@ export const AdminPanel: React.FC<Props> = ({
                                         scheduleForm.theme === t.name 
                                           ? (isDarkTheme ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black") 
                                           : theme === 'dark'
-                                            ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                            ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                             : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                                       )}
                                     >
@@ -5610,7 +5654,7 @@ export const AdminPanel: React.FC<Props> = ({
                           <input
                             type="text"
                             value={isScheduledGroupSelectOpen ? groupSearch : (scheduleForm.groupId === 'all' ? '' : groups.find(g => g.id === scheduleForm.groupId)?.name || '')}
-                            placeholder="Поиск групп..."
+                            placeholder={t.searchGroup}
                             onFocus={() => {
                               setIsScheduledGroupSelectOpen(true);
                               setGroupSearch("");
@@ -5620,7 +5664,7 @@ export const AdminPanel: React.FC<Props> = ({
                               setGroupSearch(e.target.value);
                             }}
                             className={cn(
-                              "requested-surface w-full h-[38px] border-2 border-bento-border px-4 text-xs font-black text-bento-text-main placeholder:text-zinc-400 dark:placeholder:text-zinc-500 placeholder:opacity-100 outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
+                              "requested-surface dark:bg-bento-card w-full h-[38px] border-2 border-bento-border px-4 text-xs font-black text-bento-text-main placeholder:text-zinc-400 dark:placeholder:text-zinc-500 placeholder:opacity-100 outline-none focus:border-zinc-400 dark:focus:border-zinc-500 transition-all",
                               isScheduledGroupSelectOpen ? "rounded-t-xl" : "rounded-xl"
                             )}
                           />
@@ -5635,7 +5679,7 @@ export const AdminPanel: React.FC<Props> = ({
                               initial={{ opacity: 0, y: -5 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -5 }}
-                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-zinc-950 border-2 border-t-0 border-bento-border rounded-b-xl shadow-xl overflow-hidden z-[120] -mt-[1px] flex flex-col"
+                              className="absolute left-0 right-0 top-full bg-bento-card dark:bg-bento-card border-2 border-t-0 border-bento-border rounded-b-xl shadow-xl overflow-hidden z-[120] -mt-[1px] flex flex-col"
                             >
                               <div className="max-h-[200px] overflow-y-auto p-1 py-1.5 space-y-0.5 custom-scrollbar">
                                 {groups.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase())).map(g => (
@@ -5650,7 +5694,7 @@ export const AdminPanel: React.FC<Props> = ({
                                       scheduleForm.groupId === g.id 
                                         ? (isDarkTheme ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-300 font-black" : "bg-indigo-600/10 border-indigo-600/20 text-indigo-700 font-black") 
                                         : theme === 'dark'
-                                          ? "bg-transparent border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
+                                          ? "bg-bento-card border-transparent text-bento-text-main hover:border-indigo-500/35 hover:bg-indigo-500/10"
                                           : "bg-transparent border-transparent text-bento-text-main hover:border-indigo-400/50 hover:bg-indigo-50"
                                     )}
                                   >
@@ -5677,9 +5721,9 @@ export const AdminPanel: React.FC<Props> = ({
                         <button 
                           type="button"
                           onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                          className="w-full bg-indigo-600/5 dark:bg-white/5 border-2 border-bento-border rounded-xl px-4 py-2 h-[38px] text-xs font-black outline-none hover:border-indigo-500 focus:border-indigo-500 text-bento-text-main transition-all pr-10 flex items-center text-left"
+                          className="requested-surface w-full border-2 border-bento-border rounded-xl px-4 py-2 h-[38px] text-xs font-black outline-none hover:border-indigo-500 focus:border-indigo-500 text-bento-text-main transition-all pr-10 flex items-center text-left"
                         >
-                          {scheduleForm.date ? new Date(scheduleForm.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Выберите дату'}
+                          {scheduleForm.date ? new Date(scheduleForm.date).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }) : t.chooseDate}
                         </button>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400 group-hover/date:text-indigo-500 transition-colors">
                           <Calendar size={14} />
@@ -5691,7 +5735,7 @@ export const AdminPanel: React.FC<Props> = ({
                               initial={{ opacity: 0, y: 10, scale: 0.95 }}
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                              className="absolute top-full left-0 w-full mt-2 bg-bento-card dark:bg-[#0f172a] border-2 border-bento-border rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[100] overflow-hidden p-4"
+                              className="absolute top-full left-0 w-full mt-2 bg-bento-card border-2 border-bento-border rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[100] overflow-hidden p-4"
                             >
                               {/* Calendar Header */}
                               <div className="flex items-center justify-between mb-4 border-b border-bento-border pb-3">
@@ -5718,7 +5762,7 @@ export const AdminPanel: React.FC<Props> = ({
                                         : "text-bento-text-main hover:bg-zinc-100 dark:hover:bg-white/5"
                                     )}
                                   >
-                                    {currentCalendarDate.toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { month: 'long' })}
+                                    {currentCalendarDate.toLocaleDateString(locale, { month: 'long' })}
                                   </button>
                                   <span className="text-zinc-300 dark:text-zinc-700 text-xs font-bold">/</span>
                                   <button
@@ -5752,7 +5796,9 @@ export const AdminPanel: React.FC<Props> = ({
                                 <>
                                   {/* Week Days */}
                                   <div className="grid grid-cols-7 gap-1 mb-2">
-                                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => (
+                                    {Array.from({ length: 7 }, (_, index) =>
+                                      new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(new Date(2024, 0, index + 1))
+                                    ).map(day => (
                                       <div key={day} className="text-[8px] font-black text-center text-zinc-400 uppercase tracking-tighter">
                                         {day}
                                       </div>
@@ -5818,7 +5864,7 @@ export const AdminPanel: React.FC<Props> = ({
                               {adminCalendarView === 'months' && (
                                 <div className="grid grid-cols-3 gap-2 py-1">
                                   {Array.from({ length: 12 }).map((_, i) => {
-                                    const monthName = new Date(2000, i, 1).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'uz-UZ', { month: 'short' });
+                                    const monthName = new Date(2000, i, 1).toLocaleDateString(locale, { month: 'short' });
                                     const isSelected = currentCalendarDate.getMonth() === i;
                                     return (
                                       <button
@@ -5939,7 +5985,7 @@ export const AdminPanel: React.FC<Props> = ({
                         <div className="flex items-center gap-6">
                            <div className="flex flex-col">
                              <span className="text-xs font-black uppercase tracking-tight">{exam.theme}</span>
-                             <span className="text-[10px] text-zinc-400 font-bold">{exam.groupId === 'all' ? 'Все группы' : groups.find(g => g.id === exam.groupId)?.name}</span>
+                             <span className="text-[10px] text-zinc-400 font-bold">{exam.groupId === 'all' ? t.allGroups : groups.find(g => g.id === exam.groupId)?.name}</span>
                            </div>
                            <div className="flex items-center gap-4 text-bento-text-muted">
                              <div className="flex items-center gap-1">
@@ -6124,13 +6170,13 @@ export const AdminPanel: React.FC<Props> = ({
                                   </div>
                                   <button 
                                     onClick={() => {
-                                      if (confirm(language === 'ru' ? 'Вы уверены, что хотите восстановить эту версию бэкапа? Текущие данные будут перезаписаны!' : 'Ushbu zaxira nusxasini tiklamoqchimisiz? Hozirgi ma’lumotlar o‘chib ketadi!')) {
+                                      if (confirm(t.confirmRestoreBackup)) {
                                         handleRestoreBackupData(backup.data);
                                       }
                                     }}
                                     className="px-3 py-1.5 bg-zinc-800 hover:bg-indigo-600 hover:text-white text-zinc-300 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
                                   >
-                                    {language === 'ru' ? 'Восстановить' : 'Tiklash'}
+                                    {t.restore}
                                   </button>
                                 </div>
                               ))}
