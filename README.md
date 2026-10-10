@@ -43,7 +43,7 @@ The installed application checks for updates when it starts, downloads them, the
 
 ## Application and installer icon
 
-The current web icon is loaded from Icons8. The Windows installer icon must be a local `.ico` file; it is not taken from the web page. Replace `build/icon.ico` with a multi-size Windows icon (including 16, 32, 48, and 256 px images). The build configuration already points to this path. If you have a PNG/JPG, convert it to `.ico` with an image editor first; renaming a PNG to `.ico` does not convert it.
+The current web icon is loaded from Icons8. Windows desktop/app icons and the installer-file icon are both configured to use `build/icon.ico`: the top-level `icon` sets the app/shortcut icon, and `nsis.installerIcon` sets the setup EXE icon. Replace that file with a multi-size Windows icon (including 16, 32, 48, and 256 px images). If you want different pictures, set these two configuration values to separate `.ico` paths. If you have a PNG/JPG, convert it to `.ico` with an image editor first; renaming a PNG to `.ico` does not convert it.
 
 To publish a changed Windows icon, increment the three-part version in `package.json`, run `npm run electron:build`, then publish the generated installer, `.blockmap`, and `latest.yml` in a matching GitHub Release as described above. The icon on installed applications changes after they install that release. The web/PWA icon is separate and is configured in `public/manifest.json` and `index.html`.
 

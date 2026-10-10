@@ -29,6 +29,7 @@ win:
   signDlls: false
 nsis:
   oneClick: false
+  installerIcon: build/icon.ico
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
