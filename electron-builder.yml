@@ -1,7 +1,7 @@
 appId: com.anatomyzh.desktop
 productName: Test Portal
 artifactName: Academic-3D-Test-Portal-Setup-${version}.${ext}
-icon: build/icon.ico
+icon: build/app-icon.ico
 asar: true
 compression: maximum
 removePackageScripts: true
@@ -29,7 +29,7 @@ win:
   signDlls: false
 nsis:
   oneClick: false
-  installerIcon: build/icon.ico
+  installerIcon: build/installer-icon.ico
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
