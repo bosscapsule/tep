@@ -43,6 +43,8 @@ The installed application checks for updates when it starts, downloads them, the
 
 ## Application and installer icon
 
-The current web icon is loaded from Icons8. The Windows installer icon must be a local `.ico` file; it is not taken from the web page. To replace it, put a multi-size Windows icon at `build/icon.ico`, then add `icon: build/icon.ico` under the top level of `electron-builder.yml` before building. A PNG can be converted to `.ico` with an image editor or an icon converter. The same new icon can be used in `public/manifest.json` and `index.html` for the web/PWA version.
+The current web icon is loaded from Icons8. The Windows installer icon must be a local `.ico` file; it is not taken from the web page. Replace `build/icon.ico` with a multi-size Windows icon (including 16, 32, 48, and 256 px images). The build configuration already points to this path. If you have a PNG/JPG, convert it to `.ico` with an image editor first; renaming a PNG to `.ico` does not convert it.
+
+To publish a changed Windows icon, increment the three-part version in `package.json`, run `npm run electron:build`, then publish the generated installer, `.blockmap`, and `latest.yml` in a matching GitHub Release as described above. The icon on installed applications changes after they install that release. The web/PWA icon is separate and is configured in `public/manifest.json` and `index.html`.
 
 There is no `Telegram` reference in the current source or installer configuration. The new NSIS display name is `Academic 3D Test Portal`, so a newly built installer will not contain that old word from this project.

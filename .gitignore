@@ -11,6 +11,10 @@ build-output.txt
 build-log.txt
 .env*
 !.env.example
+!build/
+build/*
+!build/.gitkeep
+!build/icon.ico
 !dist/
 dist/*
 !dist/assets/
