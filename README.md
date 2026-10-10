@@ -34,12 +34,12 @@ Auto-update works only for an installed, packaged Windows build. It does not run
 
 The updater checks GitHub Releases in `bosscapsule/tep`. To publish an update:
 
-1. Increase the `version` in `package.json` (for example, `1.2.0`).
-2. Run `npm run electron:build`.
+1. Increase the three-part `version` in `package.json` (for example, `1.3.0`). The build automatically names the installer with only major and minor (for example, package version `1.2.0` produces `Academic-3D-Test-Portal-Setup-1.2.exe`).
+2. Run `npm run electron:build`. The build verifies that the installer, blockmap, and `latest.yml` match the package version, then removes older setup files from `dist-electron/`. If verification fails, the build exits with an error and leaves old installers in place.
 3. Create a GitHub Release with the new version tag, for example `v1.2.0`.
-4. Upload the generated `Academic-3D-Test-Portal-Setup-1.2.0.exe`, its `.blockmap`, and `latest.yml` from `dist-electron/`.
+4. Upload the generated `Academic-3D-Test-Portal-Setup-1.2.exe`, its `.blockmap`, and `latest.yml` from `dist-electron/`.
 
-The installed application checks for updates when it starts, downloads them, then closes and installs the update automatically. Changing the application name or icon also requires a new version and a new release.
+The installed application checks for updates when it starts, downloads them, then closes and installs the update automatically. This `1.2.0` release is newer than `1.1.1`/`1.1.2`, so installed applications can receive it through auto-update. Changing the application name or icon also requires a new version and a new release.
 
 ## Application and installer icon
 

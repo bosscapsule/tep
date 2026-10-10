@@ -120,7 +120,7 @@ export const AdminAuth: React.FC<Props> = ({ onLogin, language, setLanguage }) =
               
               {(() => {
                 const activeUni = storage.getCurrentUniversity();
-                if (activeUni) {
+                if (activeUni && security.isUniversityPasswordRememberEnabled(activeUni.id)) {
                   return (
                     <div className="mt-4 px-4 py-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400">
                       <span>🏛️</span>

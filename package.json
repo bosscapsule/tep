@@ -1,7 +1,7 @@
 {
   "name": "test-portal",
   "private": true,
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Academic 3D Test Portal desktop application",
   "author": "Anatomyzh Team",
   "type": "module",
@@ -13,7 +13,7 @@
     "clean": "rm -rf dist dist-electron",
     "lint": "tsc --noEmit",
     "electron:dev": "concurrently -k \"npm run dev\" \"electron .\"",
-    "electron:build": "npm run build && electron-builder --win"
+    "electron:build": "npm run build && electron-builder --win --x64 && node scripts/verify-windows-build.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

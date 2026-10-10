@@ -706,7 +706,6 @@ export const AdminPanel: React.FC<Props> = ({
       alert(t.expirySyncFailed);
     }
     setIsExpiryExtensionPickerOpen(false);
-    setExpiryExtensionTargetId(null);
     audit.record('university_key_rotated', 'superadmin', university.id, `expiry extended to ${dateStr}`);
     refreshAuditState();
   };
@@ -721,8 +720,21 @@ export const AdminPanel: React.FC<Props> = ({
     }
   });
 
+  const [rememberedPasswordIds, setRememberedPasswordIds] = useState<string[]>(() => {
+    try {
+      const savedPasswords = JSON.parse(localStorage.getItem('saved_university_password_values_v2') || '{}') as Record<string, unknown>;
+      return Object.entries(savedPasswords)
+        .filter(([, password]) => typeof password === 'string' && password.length > 0)
+        .map(([universityId]) => universityId);
+    } catch (error) {
+      console.error('Failed to load remembered university passwords:', error);
+      return [];
+    }
+  });
+
   const isUniversitySavedBySuperAdmin = (universityId: string) =>
-    rememberedUniversityIds.includes(universityId);
+    rememberedUniversityIds.includes(universityId)
+    && security.isUniversityPasswordRememberEnabled(universityId);
 
   const toggleRememberUniversity = (university: University) => {
     const isRemembered = isUniversitySavedBySuperAdmin(university.id);
@@ -731,16 +743,14 @@ export const AdminPanel: React.FC<Props> = ({
       : [...rememberedUniversityIds, university.id];
 
     try {
-      const savedPasswords = JSON.parse(localStorage.getItem('saved_university_password_values_v1') || '{}') as Record<string, string>;
       if (isRemembered) {
+        const savedPasswords = JSON.parse(localStorage.getItem('saved_university_password_values_v2') || '{}') as Record<string, string>;
         delete savedPasswords[university.id];
-      } else {
-        savedPasswords[university.id] = security.encryptField(university.key);
+        localStorage.setItem('saved_university_password_values_v2', JSON.stringify(savedPasswords));
       }
-      localStorage.setItem('saved_university_password_values_v1', JSON.stringify(savedPasswords));
       localStorage.setItem('saved_university_passwords_v1', JSON.stringify(nextIds));
     } catch (error) {
-      console.error('Failed to save remembered university password:', error);
+      console.error('Failed to update university password remembering setting:', error);
       alert(t.rememberPasswordFailed);
       return;
     }
@@ -750,13 +760,13 @@ export const AdminPanel: React.FC<Props> = ({
   const rememberActiveUniversity = () => {
     if (!activeUniversity) return;
     try {
-      const savedPasswords = JSON.parse(localStorage.getItem('saved_university_password_values_v1') || '{}') as Record<string, string>;
+      const savedPasswords = JSON.parse(localStorage.getItem('saved_university_password_values_v2') || '{}') as Record<string, string>;
       savedPasswords[activeUniversity.id] = security.encryptField(activeUniversity.key);
-      localStorage.setItem('saved_university_password_values_v1', JSON.stringify(savedPasswords));
+      localStorage.setItem('saved_university_password_values_v2', JSON.stringify(savedPasswords));
+      setRememberedPasswordIds((ids) => ids.includes(activeUniversity.id) ? ids : [...ids, activeUniversity.id]);
     } catch (error) {
       console.error('Failed to remember active university password:', error);
       alert(t.rememberPasswordFailed);
-      return;
     }
   };
 
@@ -2061,7 +2071,7 @@ export const AdminPanel: React.FC<Props> = ({
                 className="px-3 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 font-black text-[10px] uppercase tracking-wider transition-all hover:bg-emerald-500/20 cursor-pointer"
                 title={t.rememberUniversityPassword}
               >
-                {t.rememberMe}
+                {rememberedPasswordIds.includes(activeUniversity.id) ? t.saved : t.rememberMe}
               </button>
             )}
           </div>

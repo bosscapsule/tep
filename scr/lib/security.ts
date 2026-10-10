@@ -38,12 +38,20 @@ export const security = {
   decryptField(value: string): string {
     return electronSecurity()?.decryptField(value) || value;
   },
+  isUniversityPasswordRememberEnabled(universityId: string): boolean {
+    try {
+      const rememberedIds: unknown = JSON.parse(localStorage.getItem('saved_university_passwords_v1') || '[]');
+      return Array.isArray(rememberedIds) && rememberedIds.includes(universityId);
+    } catch (error) {
+      console.warn('Could not read university password remembering setting:', error);
+      return false;
+    }
+  },
   getRememberedUniversityPassword(universityId: string): string {
     try {
-      const rememberedIds = JSON.parse(localStorage.getItem('saved_university_passwords_v1') || '[]');
-      if (!Array.isArray(rememberedIds) || !rememberedIds.includes(universityId)) return '';
+      if (!security.isUniversityPasswordRememberEnabled(universityId)) return '';
 
-      const passwords = JSON.parse(localStorage.getItem('saved_university_password_values_v1') || '{}');
+      const passwords = JSON.parse(localStorage.getItem('saved_university_password_values_v2') || '{}');
       const savedPassword = passwords?.[universityId];
       return typeof savedPassword === 'string' ? security.decryptField(savedPassword) : '';
     } catch (error) {
@@ -133,4 +141,5 @@ export const migrateLegacyRememberKey = async () => {
   localStorage.removeItem('saved_admin_password');
   localStorage.removeItem('saved_admin_key');
   localStorage.removeItem('saved_admin_session');
+  localStorage.removeItem('saved_university_password_values_v1');
 };
