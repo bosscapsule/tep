@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const outputDirectory = path.join(projectRoot, 'dist-electron');
+const outputDirectory = path.join(projectRoot, 'test portal');
 const packageJson = JSON.parse(await readFile(path.join(projectRoot, 'package.json'), 'utf8'));
 const [major, minor, patch, ...extraVersionParts] = packageJson.version.split('.');
 if (patch === undefined || extraVersionParts.length > 0) {

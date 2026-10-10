@@ -10,7 +10,7 @@ electronLanguages:
   - ru
   - uz
 directories:
-  output: dist-electron
+  output: "test portal"
 files:
   - dist/**/*
   - electron-main.cjs
@@ -20,7 +20,7 @@ files:
 publish:
   provider: github
   owner: bosscapsule
-  repo: tep
+  repo: test-portal
 win:
   target:
     - nsis

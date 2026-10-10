@@ -1,7 +1,7 @@
 node_modules/
 build/
 dist/
-dist-electron/
+test portal/
 portable/
 extracted_app/
 coverage/
@@ -22,8 +22,3 @@ dist/*
 dist/assets/*
 !dist/assets/index-*.js
 !dist/assets/index-*.css
-!dist-electron/
-dist-electron/*
-!dist-electron/Academic-3D-Test-Portal-Setup-*.exe
-!dist-electron/Academic-3D-Test-Portal-Setup-*.exe.blockmap
-!dist-electron/latest.yml
