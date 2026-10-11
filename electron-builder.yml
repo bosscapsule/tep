@@ -1,6 +1,6 @@
 appId: com.anatomyzh.desktop
 productName: Test Portal
-artifactName: Academic-3D-Test-Portal-Setup-${version}.${ext}
+artifactName: Academic-3D-Test-Portal-${arch}-Setup-${version}.${ext}
 icon: build/app-icon.ico
 asar: true
 compression: maximum
@@ -23,7 +23,10 @@ publish:
   repo: test-portal
 win:
   target:
-    - nsis
+    - target: nsis
+      arch:
+        - x64
+        - arm64
   sign: null
   signAndEditExecutable: false
   signDlls: false

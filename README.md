@@ -34,7 +34,7 @@ Auto-update works only for an installed, packaged Windows build. It does not run
 
 The updater checks GitHub Releases in `bosscapsule/test-portal`. To publish an update:
 
-1. Increase the three-part `version` in `package.json` (for example, `1.4.0`). The build automatically names the installer with only major and minor (for example, package version `1.4.0` produces `Academic-3D-Test-Portal-Setup-1.4.exe`).
+1. Increase the three-part `version` in `package.json` (for example, `1.4.0`). The Windows build produces architecture-specific installers, for example `Academic-3D-Test-Portal-x64-Setup-1.4.exe` and `Academic-3D-Test-Portal-arm64-Setup-1.4.exe`.
 2. Run `npm run electron:build`. The build writes to `test portal/`, verifies that the installer, blockmap, and `latest.yml` match the package version, then removes older setup files from that folder. If verification fails, the build exits with an error and leaves old installers in place.
 3. Create a GitHub Release with the new version tag, for example `v1.4.0`.
 4. Upload the generated installer, its `.blockmap`, and `latest.yml` from `test portal/`.
