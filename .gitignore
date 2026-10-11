@@ -1,6 +1,7 @@
 node_modules/
 build/
 dist/
+dist-electron/
 test portal/
 portable/
 extracted_app/
