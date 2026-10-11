@@ -1,0 +1,60 @@
+name: Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/windows-installer.yml'
+      - 'build/**'
+      - 'electron-builder.yml'
+      - 'electron-main.cjs'
+      - 'electron-security.cjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'preload.js'
+      - 'public/**'
+      - 'scr/**'
+      - 'index.html'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - 'scripts/verify-windows-build.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check TypeScript
+        run: npm run lint
+
+      - name: Build Windows installer
+        run: npm run electron:build
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-${{ github.run_number }}
+          path: |
+            test portal/Academic-3D-Test-Portal-Setup-*.exe
+            test portal/Academic-3D-Test-Portal-Setup-*.exe.blockmap
+            test portal/latest.yml
+          if-no-files-found: error
+          retention-days: 14
