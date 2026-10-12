@@ -600,7 +600,6 @@ export const AdminPanel: React.FC<Props> = ({
   const [expandedThemes, setExpandedThemes] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
-  const [autoBackups, setAutoBackups] = useState<any[]>([]);
   const [uniToDelete, setUniToDelete] = useState<University | null>(null);
   const [isSuperAdminDatePickerOpen, setIsSuperAdminDatePickerOpen] = useState(false);
   const [currentSuperAdminCalendarDate, setCurrentSuperAdminCalendarDate] = useState(new Date());
@@ -1191,118 +1190,6 @@ export const AdminPanel: React.FC<Props> = ({
     return () => clearInterval(interval);
   }, [settings.scheduledExams]);
 
-  const runAutoBackup = () => {
-    try {
-      const data = {
-        questions: storage.getQuestions(),
-        students: storage.getStudents(),
-        groups: storage.getGroups(),
-        examThemes: storage.getExamThemes(),
-        settings: storage.getSettings(),
-        results: storage.getResults(),
-        timestamp: Date.now()
-      };
-      
-      const rawBackups = localStorage.getItem('tester_pro_auto_backups');
-      let backupsList = rawBackups ? JSON.parse(rawBackups) : [];
-      if (!Array.isArray(backupsList)) backupsList = [];
-      
-      // Add new backup
-      backupsList.unshift({
-        timestamp: Date.now(),
-        data
-      });
-      
-      // Keep only last 5
-      backupsList = backupsList.slice(0, 5);
-      localStorage.setItem('tester_pro_auto_backups', JSON.stringify(backupsList));
-      setAutoBackups(backupsList);
-    } catch (e) {
-      console.error("Auto backup failed:", e);
-    }
-  };
-
-  const loadAutoBackups = () => {
-    try {
-      const rawBackups = localStorage.getItem('tester_pro_auto_backups');
-      let backupsList = rawBackups ? JSON.parse(rawBackups) : [];
-      if (Array.isArray(backupsList)) {
-        setAutoBackups(backupsList);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleDownloadBackup = () => {
-    try {
-      const data = {
-        questions: storage.getQuestions(),
-        students: storage.getStudents(),
-        groups: storage.getGroups(),
-        examThemes: storage.getExamThemes(),
-        settings: storage.getSettings(),
-        results: storage.getResults(),
-        timestamp: Date.now()
-      };
-      const jsonStr = JSON.stringify(data, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `tester_pro_database_backup_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      alert("Error generating backup file");
-    }
-  };
-
-  const handleRestoreBackupData = (data: any) => {
-    if (!data || !data.questions || !data.students || !data.groups) {
-      alert(t.invalidBackupFormat);
-      return false;
-    }
-    
-    // Unpack data
-    if (data.questions) storage.saveQuestions(data.questions);
-    if (data.students) storage.saveStudents(data.students);
-    if (data.groups) storage.saveGroups(data.groups);
-    if (data.examThemes) storage.saveExamThemes(data.examThemes);
-    if (data.settings) storage.saveSettings(data.settings);
-    if (data.results) storage.saveResults(data.results);
-    
-    // Reload state
-    setGroups(storage.getGroups().sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
-    setStudents(storage.getStudents());
-    setQuestions(storage.getQuestions());
-    setResults(storage.getResults());
-    setExamThemes(storage.getExamThemes());
-    setSettings(storage.getSettings());
-    setTimerMinutes(storage.getSettings().timerMinutes);
-    
-    alert(t.backupRestored);
-    return true;
-  };
-
-  const handleUploadBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const parsed = JSON.parse(evt.target?.result as string);
-        handleRestoreBackupData(parsed);
-      } catch (err) {
-        alert(t.backupReadFailed);
-      }
-    };
-    reader.readAsText(file);
-  };
-
   useEffect(() => {
     setGroups(storage.getGroups().sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
     setStudents(storage.getStudents());
@@ -1311,8 +1198,6 @@ export const AdminPanel: React.FC<Props> = ({
     setExamThemes(storage.getExamThemes());
     setSettings(storage.getSettings());
     setTimerMinutes(storage.getSettings().timerMinutes);
-    loadAutoBackups();
-    setTimeout(runAutoBackup, 1500); // Trigger non-blocking auto-backup on mount
   }, []);
 
   useEffect(() => {
@@ -6138,62 +6023,6 @@ export const AdminPanel: React.FC<Props> = ({
                         </div>
                      </div>
 
-                     <div className="p-6 bg-bento-card rounded-2xl border border-bento-border space-y-4">
-                        <h3 className="text-xs font-black uppercase tracking-widest text-zinc-400">
-                          {t.backupRestore}
-                        </h3>
-                        <p className="text-[11px] text-zinc-400 leading-relaxed font-bold">
-                          {t.backupDescription}
-                        </p>
-                        
-                        <div className="flex flex-wrap gap-3">
-                           <button 
-                             onClick={handleDownloadBackup}
-                             className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
-                           >
-                             <Download size={14} /> 
-                             {t.downloadBackup}
-                           </button>
-
-                           <label className="flex items-center gap-2 px-4 py-2.5 bg-bento-bg hover:bg-zinc-800 text-bento-text-main border border-bento-border rounded-xl text-xs font-black uppercase tracking-wider transition-colors cursor-pointer">
-                             <Upload size={14} /> 
-                             {t.restoreBackup}
-                             <input type="file" className="hidden" accept=".json" onChange={handleUploadBackupFile} />
-                           </label>
-                        </div>
-
-                        {autoBackups.length > 0 && (
-                          <div className="pt-3 border-t border-bento-border/50">
-                            <p className="text-[10px] font-extrabold uppercase tracking-widest text-zinc-400 mb-2.5">
-                              {t.backupHistory}:
-                            </p>
-                            <div className="space-y-2">
-                              {autoBackups.map((backup, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-3 bg-bento-bg/40 border border-bento-border/40 rounded-xl">
-                                  <div>
-                                    <p className="text-xs font-bold text-bento-text-main">
-                                      {idx === 0 ? t.currentSession : `${t.archive} #${idx}`}
-                                    </p>
-                                    <p className="text-[10px] text-zinc-400 font-mono">
-                                      {new Date(backup.timestamp).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  <button 
-                                    onClick={() => {
-                                      if (confirm(t.confirmRestoreBackup)) {
-                                        handleRestoreBackupData(backup.data);
-                                      }
-                                    }}
-                                    className="px-3 py-1.5 bg-zinc-800 hover:bg-indigo-600 hover:text-white text-zinc-300 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
-                                  >
-                                    {t.restore}
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                     </div>
                  </div>
               </div>
             )}
