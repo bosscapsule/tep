@@ -32,6 +32,7 @@ The desktop app stores the password encrypted in the operating system user-data 
 
 Auto-update works only for an installed, packaged Windows build. It does not run from `npm run electron:dev` and it does not update a standalone `.exe` downloaded without installation.
 
+The Windows installer is built on a Windows GitHub Actions runner, so the build does not depend on Wine or publish credentials. Push a change to the application/build files on `main`, or start the **Windows installer** workflow manually from the Actions tab. Download the installer, `.blockmap`, and `latest.yml` from the completed run's artifact.
 The updater checks GitHub Releases in `bosscapsule/test-portal`. To publish an update:
 
 1. Increase the three-part `version` in `package.json` (for example, `1.4.0`). The Windows build packages both x64 and ARM64 in one installer, for example `Academic-3D-Test-Portal-Setup-1.4.exe`.
