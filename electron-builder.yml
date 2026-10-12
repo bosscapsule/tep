@@ -28,7 +28,7 @@ win:
         - x64
         - arm64
   sign: null
-  signAndEditExecutable: false
+  signAndEditExecutable: true
   signDlls: false
 nsis:
   oneClick: false
